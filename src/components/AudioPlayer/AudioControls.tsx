@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import { AudioState } from '@/types/lyrics';
 import { Waveform } from './Waveform';
 import { formatSeconds } from '@/utils/formatTime';
@@ -14,7 +14,6 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
 
 interface AudioControlsProps {
   audioState: AudioState;
@@ -25,7 +24,8 @@ interface AudioControlsProps {
   onSeek: (time: number) => void;
   onRewind: (seconds?: number) => void;
   onForward: (seconds?: number) => void;
-  onCaptureTimestamp: () => void;
+  onCaptureStartTime: () => void;
+  onCaptureEndTime: () => void;
   selectedLineText: string;
 }
 
@@ -38,7 +38,8 @@ export const AudioControls = ({
   onSeek,
   onRewind,
   onForward,
-  onCaptureTimestamp,
+  onCaptureStartTime,
+  onCaptureEndTime,
   selectedLineText,
 }: AudioControlsProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -57,11 +58,18 @@ export const AudioControls = ({
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't capture if typing in an input
+      // Don't capture if typing in an input (except for specific shortcuts)
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        if (e.code === 'Space' && e.shiftKey) {
+        // Allow [ and ] in inputs for timestamp capture
+        if (e.key === '[') {
           e.preventDefault();
-          onCaptureTimestamp();
+          onCaptureStartTime();
+          return;
+        }
+        if (e.key === ']') {
+          e.preventDefault();
+          onCaptureEndTime();
+          return;
         }
         return;
       }
@@ -69,11 +77,7 @@ export const AudioControls = ({
       switch (e.code) {
         case 'Space':
           e.preventDefault();
-          if (e.shiftKey) {
-            onCaptureTimestamp();
-          } else {
-            onPlayPause();
-          }
+          onPlayPause();
           break;
         case 'ArrowLeft':
           e.preventDefault();
@@ -83,12 +87,32 @@ export const AudioControls = ({
           e.preventDefault();
           onForward(e.shiftKey ? 1 : 5);
           break;
+        case 'BracketLeft': // [
+          e.preventDefault();
+          onCaptureStartTime();
+          break;
+        case 'BracketRight': // ]
+          e.preventDefault();
+          onCaptureEndTime();
+          break;
+        case 'KeyS':
+          if (e.shiftKey) {
+            e.preventDefault();
+            onCaptureStartTime();
+          }
+          break;
+        case 'KeyE':
+          if (e.shiftKey) {
+            e.preventDefault();
+            onCaptureEndTime();
+          }
+          break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onPlayPause, onRewind, onForward, onCaptureTimestamp]);
+  }, [onPlayPause, onRewind, onForward, onCaptureStartTime, onCaptureEndTime]);
 
   return (
     <div className="h-full flex flex-col bg-panel rounded-lg border border-panel-border">
@@ -160,18 +184,29 @@ export const AudioControls = ({
             </Button>
           </div>
 
-          {/* Timestamp capture */}
-          <Button
-            variant="secondary"
-            onClick={onCaptureTimestamp}
-            disabled={!audioState.isLoaded}
-            className="flex-shrink-0"
-            title="Capture timestamp (Shift+Space)"
-          >
-            <span className="kbd mr-2 text-[10px]">⇧</span>
-            <span className="kbd mr-2 text-[10px]">Space</span>
-            Sync
-          </Button>
+          {/* Timestamp capture buttons */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onCaptureStartTime}
+              disabled={!audioState.isLoaded}
+              title="Set start time ([ or Shift+S)"
+            >
+              <span className="kbd mr-1 text-[10px]">[</span>
+              Start
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onCaptureEndTime}
+              disabled={!audioState.isLoaded}
+              title="Set end time (] or Shift+E)"
+            >
+              <span className="kbd mr-1 text-[10px]">]</span>
+              End
+            </Button>
+          </div>
 
           {/* Current line preview */}
           <div className="flex-1 min-w-0 px-4">

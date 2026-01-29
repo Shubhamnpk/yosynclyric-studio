@@ -9,7 +9,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 
@@ -51,7 +50,6 @@ export const LyricLineItem = ({
   onAddLineAfter,
   onKeyDown,
 }: LyricLineItemProps) => {
-  const [isEditing, setIsEditing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -69,6 +67,8 @@ export const LyricLineItem = ({
     }
   };
 
+  const hasTimestamps = line.startTime !== null || line.endTime !== null;
+
   return (
     <div
       className={cn(
@@ -84,10 +84,14 @@ export const LyricLineItem = ({
         <GripVertical className="h-4 w-4" />
       </div>
 
-      {/* Timestamp */}
-      <div className="flex-shrink-0 w-24 pt-2">
-        <span className="timestamp-display text-sm font-mono">
-          {formatTimestamp(line.timestamp)}
+      {/* Timestamps - Start and End */}
+      <div className="flex-shrink-0 w-40 pt-2 flex items-center gap-1">
+        <span className="timestamp-display text-xs font-mono" title="Start time">
+          {formatTimestamp(line.startTime)}
+        </span>
+        <span className="text-muted-foreground text-xs">→</span>
+        <span className="timestamp-display text-xs font-mono" title="End time">
+          {formatTimestamp(line.endTime)}
         </span>
       </div>
 
@@ -147,7 +151,7 @@ export const LyricLineItem = ({
 
       {/* Actions */}
       <div className="flex-shrink-0 flex items-center gap-1 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        {line.timestamp !== null && (
+        {hasTimestamps && (
           <Button
             variant="ghost"
             size="icon"
@@ -156,7 +160,7 @@ export const LyricLineItem = ({
               e.stopPropagation();
               onTimestampClear();
             }}
-            title="Clear timestamp"
+            title="Clear timestamps"
           >
             <Clock className="h-3 w-3" />
           </Button>

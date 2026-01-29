@@ -95,14 +95,14 @@ export const LyricsPreview = ({
                   >
                     {line.text}
                   </p>
-                  {line.timestamp !== null && (
+                  {(line.startTime !== null || line.endTime !== null) && (
                     <span
                       className={cn(
                         'timestamp-display text-xs mt-1 block opacity-50',
                         isActive && 'opacity-100'
                       )}
                     >
-                      {formatTimestamp(line.timestamp)}
+                      {formatTimestamp(line.startTime)} → {formatTimestamp(line.endTime)}
                     </span>
                   )}
                 </div>

@@ -1,9 +1,10 @@
-import { KeyboardEvent, useCallback, useRef, useEffect } from 'react';
+import { KeyboardEvent, useCallback, useState } from 'react';
 import { LyricLine, SectionType, LyricsProject } from '@/types/lyrics';
 import { LyricLineItem } from './LyricLineItem';
+import { BulkImportDialog } from './BulkImportDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, FileText } from 'lucide-react';
+import { Plus, FileText, Upload } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface LyricsPanelProps {
@@ -17,6 +18,7 @@ interface LyricsPanelProps {
   onSetSection: (id: string, section: SectionType) => void;
   onClearTimestamp: (id: string) => void;
   onUpdateProject: (updates: Partial<LyricsProject>) => void;
+  onImportBulkLyrics: (text: string, replace: boolean) => void;
 }
 
 export const LyricsPanel = ({
@@ -30,16 +32,9 @@ export const LyricsPanel = ({
   onSetSection,
   onClearTimestamp,
   onUpdateProject,
+  onImportBulkLyrics,
 }: LyricsPanelProps) => {
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  // Scroll active line into view
-  useEffect(() => {
-    if (activeLineId) {
-      const element = document.getElementById(`line-${activeLineId}`);
-      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }, [activeLineId]);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   const handleKeyDown = useCallback((lineId: string, e: KeyboardEvent<HTMLTextAreaElement>) => {
     const currentIndex = project.lines.findIndex(l => l.id === lineId);
@@ -56,13 +51,25 @@ export const LyricsPanel = ({
     }
   }, [project.lines, onSelectLine, onDeleteLine]);
 
+  const hasExistingLyrics = project.lines.some(l => l.text.trim());
+
   return (
     <div className="h-full flex flex-col bg-panel rounded-lg border border-panel-border">
       {/* Header */}
       <div className="flex-shrink-0 p-4 border-b border-panel-border">
-        <div className="flex items-center gap-2 mb-3">
-          <FileText className="h-5 w-5 text-primary" />
-          <h2 className="font-semibold text-lg">Lyrics Editor</h2>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" />
+            <h2 className="font-semibold text-lg">Lyrics Editor</h2>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setImportDialogOpen(true)}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Import Lyrics
+          </Button>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Input
@@ -115,6 +122,14 @@ export const LyricsPanel = ({
           Add Line
         </Button>
       </div>
+
+      {/* Bulk Import Dialog */}
+      <BulkImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImport={onImportBulkLyrics}
+        hasExistingLyrics={hasExistingLyrics}
+      />
     </div>
   );
 };

@@ -3,7 +3,8 @@ export type SectionType = 'verse' | 'chorus' | 'bridge' | 'outro' | 'intro' | 'p
 export interface LyricLine {
   id: string;
   text: string;
-  timestamp: number | null; // milliseconds
+  startTime: number | null;  // When line appears (ms)
+  endTime: number | null;    // When line disappears (ms)
   section: SectionType;
 }
 
