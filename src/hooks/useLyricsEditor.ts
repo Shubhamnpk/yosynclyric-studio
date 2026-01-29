@@ -6,7 +6,8 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 const createEmptyLine = (): LyricLine => ({
   id: generateId(),
   text: '',
-  timestamp: null,
+  startTime: null,
+  endTime: null,
   section: null,
 });
 
@@ -75,9 +76,13 @@ export const useLyricsEditor = () => {
     updateLine(lineId, { section });
   }, [updateLine]);
 
-  const setLineTimestamp = useCallback((lineId: string, timestamp: number) => {
-    updateLine(lineId, { timestamp });
-    // Auto-select next line after setting timestamp
+  const setLineStartTime = useCallback((lineId: string, time: number) => {
+    updateLine(lineId, { startTime: time });
+  }, [updateLine]);
+
+  const setLineEndTime = useCallback((lineId: string, time: number) => {
+    updateLine(lineId, { endTime: time });
+    // Auto-advance to next line after setting end time
     setProject(prev => {
       const index = prev.lines.findIndex(l => l.id === lineId);
       if (index < prev.lines.length - 1) {
@@ -88,13 +93,13 @@ export const useLyricsEditor = () => {
   }, [updateLine]);
 
   const clearTimestamp = useCallback((lineId: string) => {
-    updateLine(lineId, { timestamp: null });
+    updateLine(lineId, { startTime: null, endTime: null });
   }, [updateLine]);
 
   const clearAllTimestamps = useCallback(() => {
     setProject(prev => ({
       ...prev,
-      lines: prev.lines.map(line => ({ ...line, timestamp: null })),
+      lines: prev.lines.map(line => ({ ...line, startTime: null, endTime: null })),
       updatedAt: new Date(),
     }));
   }, []);
@@ -105,12 +110,24 @@ export const useLyricsEditor = () => {
   }, [updateProject]);
 
   const getActiveLineByTime = useCallback((currentTime: number): string | null => {
+    const currentTimeMs = currentTime * 1000;
+    
+    // Find line where startTime <= currentTime < endTime
+    const activeLine = project.lines.find(l => {
+      if (l.startTime === null) return false;
+      const endTime = l.endTime ?? Infinity;
+      return l.startTime <= currentTimeMs && currentTimeMs < endTime;
+    });
+    
+    if (activeLine) return activeLine.id;
+    
+    // Fallback: find the most recent line that has started
     const timestampedLines = project.lines
-      .filter(l => l.timestamp !== null)
-      .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+      .filter(l => l.startTime !== null)
+      .sort((a, b) => (a.startTime || 0) - (b.startTime || 0));
     
     for (let i = timestampedLines.length - 1; i >= 0; i--) {
-      if ((timestampedLines[i].timestamp || 0) <= currentTime * 1000) {
+      if ((timestampedLines[i].startTime || 0) <= currentTimeMs) {
         return timestampedLines[i].id;
       }
     }
@@ -137,6 +154,28 @@ export const useLyricsEditor = () => {
     });
   }, []);
 
+  const importBulkLyrics = useCallback((text: string, replace: boolean = true) => {
+    const lines = text.split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .map(text => ({
+        id: generateId(),
+        text,
+        startTime: null,
+        endTime: null,
+        section: null,
+      }));
+
+    if (lines.length === 0) return;
+
+    setProject(prev => {
+      const newLines = replace ? lines : [...prev.lines.filter(l => l.text.trim()), ...lines];
+      return { ...prev, lines: newLines, updatedAt: new Date() };
+    });
+
+    setSelectedLineId(lines[0]?.id || null);
+  }, []);
+
   return {
     project,
     selectedLineId,
@@ -148,12 +187,14 @@ export const useLyricsEditor = () => {
     addLine,
     deleteLine,
     setLineSection,
-    setLineTimestamp,
+    setLineStartTime,
+    setLineEndTime,
     clearTimestamp,
     clearAllTimestamps,
     setAudioFile,
     getActiveLineByTime,
     moveLineUp,
     moveLineDown,
+    importBulkLyrics,
   };
 };

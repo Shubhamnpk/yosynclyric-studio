@@ -20,11 +20,13 @@ export const SyncLyricsApp = () => {
     addLine,
     deleteLine,
     setLineSection,
-    setLineTimestamp,
+    setLineStartTime,
+    setLineEndTime,
     clearTimestamp,
     clearAllTimestamps,
     setAudioFile,
     getActiveLineByTime,
+    importBulkLyrics,
   } = useLyricsEditor();
 
   const {
@@ -49,12 +51,19 @@ export const SyncLyricsApp = () => {
     }
   }, [audioState.currentTime, audioState.isPlaying, getActiveLineByTime, setActiveLineId]);
 
-  // Capture timestamp
-  const handleCaptureTimestamp = useCallback(() => {
+  // Capture start time
+  const handleCaptureStartTime = useCallback(() => {
     if (selectedLineId && audioState.isLoaded) {
-      setLineTimestamp(selectedLineId, audioState.currentTime * 1000);
+      setLineStartTime(selectedLineId, audioState.currentTime * 1000);
     }
-  }, [selectedLineId, audioState.currentTime, audioState.isLoaded, setLineTimestamp]);
+  }, [selectedLineId, audioState.currentTime, audioState.isLoaded, setLineStartTime]);
+
+  // Capture end time
+  const handleCaptureEndTime = useCallback(() => {
+    if (selectedLineId && audioState.isLoaded) {
+      setLineEndTime(selectedLineId, audioState.currentTime * 1000);
+    }
+  }, [selectedLineId, audioState.currentTime, audioState.isLoaded, setLineEndTime]);
 
   const selectedLine = project.lines.find(l => l.id === selectedLineId);
 
@@ -84,6 +93,7 @@ export const SyncLyricsApp = () => {
             onSetSection={setLineSection}
             onClearTimestamp={clearTimestamp}
             onUpdateProject={updateProject}
+            onImportBulkLyrics={importBulkLyrics}
           />
         </div>
 
@@ -110,7 +120,8 @@ export const SyncLyricsApp = () => {
           onSeek={seek}
           onRewind={rewind}
           onForward={forward}
-          onCaptureTimestamp={handleCaptureTimestamp}
+          onCaptureStartTime={handleCaptureStartTime}
+          onCaptureEndTime={handleCaptureEndTime}
           selectedLineText={selectedLine?.text || ''}
         />
       </div>

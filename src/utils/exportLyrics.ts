@@ -12,14 +12,14 @@ export const exportToLRC = (project: LyricsProject): string => {
   if (project.artist) lines.push(`[ar:${project.artist}]`);
   lines.push('');
   
-  // Lyrics
+  // Lyrics - sorted by start time
   const sortedLines = [...project.lines]
     .filter(l => l.text.trim())
-    .sort((a, b) => (a.timestamp ?? Infinity) - (b.timestamp ?? Infinity));
+    .sort((a, b) => (a.startTime ?? Infinity) - (b.startTime ?? Infinity));
   
   for (const line of sortedLines) {
-    if (line.timestamp !== null) {
-      lines.push(`${formatLRCTimestamp(line.timestamp)}${line.text}`);
+    if (line.startTime !== null) {
+      lines.push(`${formatLRCTimestamp(line.startTime)}${line.text}`);
     } else {
       lines.push(line.text);
     }
@@ -34,16 +34,16 @@ export const exportToLRC = (project: LyricsProject): string => {
 export const exportToSRT = (project: LyricsProject): string => {
   const lines: string[] = [];
   const sortedLines = [...project.lines]
-    .filter(l => l.text.trim() && l.timestamp !== null)
-    .sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+    .filter(l => l.text.trim() && l.startTime !== null)
+    .sort((a, b) => (a.startTime ?? 0) - (b.startTime ?? 0));
   
   for (let i = 0; i < sortedLines.length; i++) {
     const line = sortedLines[i];
     const nextLine = sortedLines[i + 1];
     
-    const startTime = line.timestamp!;
-    // End time is either next line's start time or current + 3 seconds
-    const endTime = nextLine?.timestamp ?? (startTime + 3000);
+    const startTime = line.startTime!;
+    // Use endTime if set, otherwise next line's start time, or current + 3 seconds
+    const endTime = line.endTime ?? nextLine?.startTime ?? (startTime + 3000);
     
     lines.push(`${i + 1}`);
     lines.push(`${formatSRTTimestamp(startTime)} --> ${formatSRTTimestamp(endTime)}`);
@@ -65,15 +65,16 @@ export const exportToVTT = (project: LyricsProject): string => {
   }
   
   const sortedLines = [...project.lines]
-    .filter(l => l.text.trim() && l.timestamp !== null)
-    .sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+    .filter(l => l.text.trim() && l.startTime !== null)
+    .sort((a, b) => (a.startTime ?? 0) - (b.startTime ?? 0));
   
   for (let i = 0; i < sortedLines.length; i++) {
     const line = sortedLines[i];
     const nextLine = sortedLines[i + 1];
     
-    const startTime = line.timestamp!;
-    const endTime = nextLine?.timestamp ?? (startTime + 3000);
+    const startTime = line.startTime!;
+    // Use endTime if set, otherwise next line's start time, or current + 3 seconds
+    const endTime = line.endTime ?? nextLine?.startTime ?? (startTime + 3000);
     
     lines.push(`${formatVTTTimestamp(startTime)} --> ${formatVTTTimestamp(endTime)}`);
     lines.push(line.text);
