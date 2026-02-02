@@ -1,181 +1,184 @@
 
-# Bulk Lyrics Import with Start/End Timestamp Syncing
+# Real Audio Waveform Visualization
 
 ## Overview
 
-Transform the lyrics entry workflow to allow users to paste all lyrics at once, then sync each line with start and end timestamps while the song plays.
+Transform the current fake waveform bars into a real audio waveform that displays the actual sound data from the uploaded file. This will make it much easier for users to identify vocals, pauses, and beats when syncing lyrics.
 
-## New User Workflow
+## What You'll Get
+
+**Current State:**
+- Random bars that don't match the audio
+- No way to see where vocals or beats are
+- Difficult to find the right timing points
+
+**After Implementation:**
+- Real waveform showing actual audio peaks and valleys
+- Easy to spot quiet sections (between lyrics)
+- Visual identification of vocals vs instrumental sections
+- Playhead indicator showing exact position
+- Time markers along the timeline
+- Zoom capability for precise syncing
+- Click anywhere to seek
+- Hover to preview time position
+
+## Visual Preview
 
 ```text
-Step 1: Bulk Import
-+----------------------------------+
-|  Paste or type all lyrics here   |
-|  (one line per lyric line)       |
-|                                  |
-|  "Hello, it's me"               |
-|  "I was wondering..."           |
-|  "After all these years..."     |
-+----------------------------------+
-        [ Import Lyrics ]
+Before (fake random bars):
+┌─────────────────────────────────────────────────────────────────┐
+│  ▌▐▌▌▐▐▌▌▐▌▌▐▐▌▌▐▌▌▐▐▌▌▐▌▌▐▐▌▌▐▌▌▐▐▌▌▐▌▌▐▐▌▌▐▌▌▐▐▌▌▐▌▌▐▐▌▌▐▌  │
+└─────────────────────────────────────────────────────────────────┘
 
-Step 2: Line-by-Line Syncing
-+----------------------------------------------------------+
-| Line 1: "Hello, it's me"     [Start: 00:05.320] [End: 00:08.150]  |
-| Line 2: "I was wondering..." [Start: --:--:--] [End: --:--:--]    | <- Selected
-| Line 3: "After all..."       [Start: --:--:--] [End: --:--:--]    |
-+----------------------------------------------------------+
-| [ Set Start ] [ Set End ] while playing audio            |
-+----------------------------------------------------------+
+After (real waveform with features):
+┌─────────────────────────────────────────────────────────────────┐
+│  0:00     0:30      1:00      1:30      2:00      2:30    3:00  │  <- Time markers
+│  ▁▃▅█▅▃▁▁▂▃▄▅▆▇█▇▆▅▄▃▂▁▁▃▅▇█▇▅▃▁▁▂▄▆█▆▄▂▁▁▃▅▇█▇▅▃▁▁▂▄▆█▆▄▂▁  │  <- Real peaks
+│                    ▼                                             │  <- Playhead
+│  ████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  │  <- Progress
+└─────────────────────────────────────────────────────────────────┘
+                      ↑ Hover: 1:23.456
 ```
 
-## What Will Change
+## Key Features
 
-**For Users:**
-- New "Import Lyrics" button opens a dialog where you can paste all lyrics at once
-- Each line automatically becomes a separate lyric entry
-- Two timestamps per line: **Start** (when to show) and **End** (when to hide)
-- Press keyboard shortcuts while playing to capture start/end times for the selected line
-
-**Current vs New:**
-| Current | New |
-|---------|-----|
-| Add lines one-by-one | Paste all lyrics, split automatically |
-| Single timestamp per line | Start and end timestamps |
-| Only captures "when to show" | Captures full duration of each line |
+1. **Real Waveform Data** - Extract actual audio peaks using Web Audio API
+2. **Playhead Indicator** - Clear vertical line showing current position
+3. **Time Markers** - Labels at regular intervals (every 30s or based on duration)
+4. **Progress Bar** - Visual indication of played vs remaining
+5. **Hover Preview** - Show timestamp when hovering
+6. **Smooth Rendering** - Optimized canvas rendering for performance
 
 ---
 
-## Technical Implementation Details
+## Technical Implementation
 
-### 1. Update Data Model
+### 1. Create Waveform Data Hook
 
-**File:** `src/types/lyrics.ts`
+**New File:** `src/hooks/useWaveformData.ts`
 
-Modify the `LyricLine` interface to support both start and end timestamps:
+This hook will:
+- Accept an audio URL or File
+- Use Web Audio API's `AudioContext` and `decodeAudioData`
+- Extract audio buffer samples
+- Downsample to create peak data for visualization
+- Return an array of normalized amplitudes (0-1)
 
 ```typescript
-export interface LyricLine {
-  id: string;
-  text: string;
-  startTime: number | null;  // When line appears (ms)
-  endTime: number | null;    // When line disappears (ms)
-  section: SectionType;
+// Process audio file to extract waveform peaks
+const extractWaveformPeaks = async (audioBuffer: AudioBuffer, samplesPerPeak: number) => {
+  const channelData = audioBuffer.getChannelData(0); // Use first channel
+  const peaks: number[] = [];
+  const blockSize = Math.floor(channelData.length / samplesPerPeak);
+  
+  for (let i = 0; i < samplesPerPeak; i++) {
+    const start = i * blockSize;
+    let max = 0;
+    for (let j = 0; j < blockSize; j++) {
+      const abs = Math.abs(channelData[start + j]);
+      if (abs > max) max = abs;
+    }
+    peaks.push(max);
+  }
+  return peaks;
+};
+```
+
+### 2. Redesign Waveform Component
+
+**Update File:** `src/components/AudioPlayer/Waveform.tsx`
+
+Transform from simple div bars to a canvas-based waveform with:
+
+**Visual Elements:**
+- Center-aligned waveform (peaks go up and down from center)
+- Gradient coloring (played = primary color, unplayed = muted)
+- Vertical playhead line at current position
+- Time markers at regular intervals
+- Hover tooltip showing timestamp
+
+**Props Interface:**
+```typescript
+interface WaveformProps {
+  duration: number;
+  currentTime: number;
+  peaks: number[];        // Real audio peak data
+  isLoading: boolean;     // Show loading state
+  onSeek: (time: number) => void;
+  className?: string;
 }
 ```
 
-### 2. Create Bulk Import Dialog
+**Rendering Approach:**
+- Use HTML5 Canvas for smooth, performant rendering
+- Draw mirrored bars (top and bottom from center line)
+- Apply gradient fill for played/unplayed sections
+- Draw playhead as animated vertical line
+- Draw time labels at calculated intervals
 
-**New File:** `src/components/LyricsEditor/BulkImportDialog.tsx`
+### 3. Update Audio Player Hook
 
-A dialog component with:
-- Large textarea for pasting multiple lines of lyrics
-- "Import" button that splits by newlines and creates `LyricLine` entries
-- Option to clear existing lyrics or append
+**Update File:** `src/hooks/useAudioPlayer.ts`
 
-### 3. Add `importBulkLyrics` Function
+Add waveform data extraction when audio is loaded:
+- Create AudioContext
+- Fetch audio file and decode it
+- Extract peak data
+- Store peaks in state and return from hook
 
-**File:** `src/hooks/useLyricsEditor.ts`
-
-New function to parse and import bulk text:
-
+New return values:
 ```typescript
-const importBulkLyrics = useCallback((text: string, replace: boolean = true) => {
-  const lines = text.split('\n')
-    .map(line => line.trim())
-    .filter(line => line.length > 0)
-    .map(text => ({
-      id: generateId(),
-      text,
-      startTime: null,
-      endTime: null,
-      section: null,
-    }));
-  
-  setProject(prev => ({
-    ...prev,
-    lines: replace ? lines : [...prev.lines, ...lines],
-    updatedAt: new Date(),
-  }));
-}, []);
+return {
+  // existing...
+  waveformPeaks: number[];
+  isLoadingWaveform: boolean;
+};
 ```
 
-### 4. Update Timestamp Capture System
+### 4. Update AudioControls
 
-**File:** `src/hooks/useLyricsEditor.ts`
+**Update File:** `src/components/AudioPlayer/AudioControls.tsx`
 
-Add separate functions for start and end timestamps:
+- Pass `waveformPeaks` and `isLoadingWaveform` to Waveform component
+- Show loading spinner while waveform is being extracted
+- Handle waveform data in the component hierarchy
 
-```typescript
-const setLineStartTime = useCallback((lineId: string, time: number) => {
-  updateLine(lineId, { startTime: time });
-}, [updateLine]);
+### 5. Update SyncLyricsApp
 
-const setLineEndTime = useCallback((lineId: string, time: number) => {
-  updateLine(lineId, { endTime: time });
-  // Auto-advance to next line after setting end time
-  const index = project.lines.findIndex(l => l.id === lineId);
-  if (index < project.lines.length - 1) {
-    setSelectedLineId(project.lines[index + 1].id);
-  }
-}, [updateLine, project.lines]);
-```
+**Update File:** `src/components/SyncLyricsApp.tsx`
 
-### 5. Update Keyboard Shortcuts
+- Receive and pass waveform data through props
 
-**File:** `src/components/AudioPlayer/AudioControls.tsx`
+### 6. Add CSS for Waveform
 
-- `Shift + S` or `[` - Set start time for selected line
-- `Shift + E` or `]` - Set end time for selected line
-- After setting end time, automatically select next line
+**Update File:** `src/index.css`
 
-### 6. Update LyricLineItem Display
-
-**File:** `src/components/LyricsEditor/LyricLineItem.tsx`
-
-Show both timestamps:
-
-```text
-[00:05.32 - 00:08.15]  "Hello, it's me"  [Clear]
-```
-
-### 7. Update LyricsPanel
-
-**File:** `src/components/LyricsEditor/LyricsPanel.tsx`
-
-- Add "Import Lyrics" button in header
-- Integrate the bulk import dialog
-- Keep existing "Add Line" for manual additions
-
-### 8. Update Preview Logic
-
-**File:** `src/components/Preview/LyricsPreview.tsx`
-
-Update `getActiveLineByTime` to use time ranges:
-
-```typescript
-// Line is active when: startTime <= currentTime < endTime
-const isActive = startTime <= currentTime && currentTime < endTime;
-```
-
-### 9. Update Export Utilities
-
-**File:** `src/utils/exportLyrics.ts`
-
-Update LRC/SRT/VTT exports to use the new start/end time format. SRT and VTT already support time ranges natively.
+Add styles for:
+- Waveform container
+- Playhead animation
+- Time markers
+- Hover tooltip
+- Loading state
 
 ---
 
 ## Files to Create/Modify
 
-| File | Action |
-|------|--------|
-| `src/types/lyrics.ts` | Modify - Add `startTime`/`endTime` |
-| `src/components/LyricsEditor/BulkImportDialog.tsx` | Create - New dialog component |
-| `src/hooks/useLyricsEditor.ts` | Modify - Add bulk import + start/end functions |
-| `src/components/LyricsEditor/LyricsPanel.tsx` | Modify - Add import button |
-| `src/components/LyricsEditor/LyricLineItem.tsx` | Modify - Show both timestamps |
-| `src/components/AudioPlayer/AudioControls.tsx` | Modify - New keyboard shortcuts |
-| `src/components/Preview/LyricsPreview.tsx` | Modify - Update active line logic |
-| `src/utils/exportLyrics.ts` | Modify - Use time ranges |
-| `src/utils/formatTime.ts` | Modify - Add range formatting |
+| File | Action | Purpose |
+|------|--------|---------|
+| `src/hooks/useWaveformData.ts` | Create | Extract real audio peaks using Web Audio API |
+| `src/components/AudioPlayer/Waveform.tsx` | Rewrite | Canvas-based real waveform with playhead and markers |
+| `src/hooks/useAudioPlayer.ts` | Modify | Integrate waveform extraction on audio load |
+| `src/components/AudioPlayer/AudioControls.tsx` | Modify | Pass waveform data and loading state |
+| `src/components/SyncLyricsApp.tsx` | Modify | Wire up waveform props |
+| `src/index.css` | Modify | Add waveform-specific styles |
+
+---
+
+## User Experience Improvements
+
+- **Easier Sync Points**: See exactly where vocals start/stop in the waveform
+- **Visual Pauses**: Flat sections = silence = good places to end lyrics
+- **Beat Detection**: Peaks often align with musical beats
+- **Precise Seeking**: Click on a visible peak to jump to that moment
+- **Time Awareness**: Always know where you are with time markers
