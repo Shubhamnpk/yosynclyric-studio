@@ -18,6 +18,8 @@ import { cn } from '@/lib/utils';
 interface AudioControlsProps {
   audioState: AudioState;
   audioUrl: string | null;
+  waveformPeaks: number[];
+  isLoadingWaveform: boolean;
   onLoadAudio: (url: string) => void;
   onSetAudioFile: (file: File) => void;
   onPlayPause: () => void;
@@ -32,6 +34,8 @@ interface AudioControlsProps {
 export const AudioControls = ({
   audioState,
   audioUrl,
+  waveformPeaks,
+  isLoadingWaveform,
   onLoadAudio,
   onSetAudioFile,
   onPlayPause,
@@ -118,10 +122,12 @@ export const AudioControls = ({
     <div className="h-full flex flex-col bg-panel rounded-lg border border-panel-border">
       {/* Waveform */}
       <div className="flex-1 bg-timeline rounded-t-lg overflow-hidden">
-        {audioState.isLoaded ? (
+        {audioState.isLoaded || isLoadingWaveform ? (
           <Waveform
             duration={audioState.duration}
             currentTime={audioState.currentTime}
+            peaks={waveformPeaks}
+            isLoading={isLoadingWaveform}
             onSeek={onSeek}
           />
         ) : (

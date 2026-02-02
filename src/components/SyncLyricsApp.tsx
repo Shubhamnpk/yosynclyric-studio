@@ -36,6 +36,8 @@ export const SyncLyricsApp = () => {
     seek,
     rewind,
     forward,
+    waveformPeaks,
+    isLoadingWaveform,
   } = useAudioPlayer();
 
   // Apply dark mode
@@ -109,11 +111,12 @@ export const SyncLyricsApp = () => {
         </div>
       </div>
 
-      {/* Bottom panel - Audio controls */}
       <div className="flex-shrink-0 p-3 pt-0">
         <AudioControls
           audioState={audioState}
           audioUrl={project.audioUrl}
+          waveformPeaks={waveformPeaks}
+          isLoadingWaveform={isLoadingWaveform}
           onLoadAudio={loadAudio}
           onSetAudioFile={setAudioFile}
           onPlayPause={togglePlayPause}
