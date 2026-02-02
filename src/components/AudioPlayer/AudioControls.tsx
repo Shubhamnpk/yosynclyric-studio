@@ -12,6 +12,7 @@ import {
   Upload,
   Volume2,
   VolumeX,
+  Music,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -118,11 +119,13 @@ export const AudioControls = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onPlayPause, onRewind, onForward, onCaptureStartTime, onCaptureEndTime]);
 
+  const showWaveform = audioState.isLoaded || isLoadingWaveform;
+
   return (
     <div className="h-full flex flex-col bg-panel rounded-lg border border-panel-border">
-      {/* Waveform */}
-      <div className="flex-1 bg-timeline rounded-t-lg overflow-hidden">
-        {audioState.isLoaded || isLoadingWaveform ? (
+      {/* Waveform Area */}
+      <div className="h-24 bg-timeline rounded-t-lg overflow-hidden">
+        {showWaveform ? (
           <Waveform
             duration={audioState.duration}
             currentTime={audioState.currentTime}
@@ -131,14 +134,25 @@ export const AudioControls = ({
             onSeek={onSeek}
           />
         ) : (
-          <div className="h-full flex items-center justify-center">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex flex-col items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Upload className="h-8 w-8" />
-              <span className="text-sm">Upload audio file</span>
-            </button>
+          <div 
+            className="h-full flex items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <div className="flex flex-col items-center gap-3 text-muted-foreground">
+              <div className="flex items-center gap-3">
+                <Music className="h-8 w-8 text-primary/60" />
+                <div className="text-left">
+                  <p className="text-sm font-medium text-foreground">Upload your audio file</p>
+                  <p className="text-xs text-muted-foreground">
+                    MP3, WAV, OGG, M4A supported
+                  </p>
+                </div>
+              </div>
+              <Button variant="secondary" size="sm" className="gap-2">
+                <Upload className="h-4 w-4" />
+                Choose File
+              </Button>
+            </div>
           </div>
         )}
       </div>

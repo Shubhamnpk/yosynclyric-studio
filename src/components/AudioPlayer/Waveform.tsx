@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 import { formatSeconds } from '@/utils/formatTime';
 import { Loader2 } from 'lucide-react';
@@ -12,14 +12,14 @@ interface WaveformProps {
   className?: string;
 }
 
-export const Waveform = ({ 
+export const Waveform = forwardRef<HTMLDivElement, WaveformProps>(({ 
   duration, 
   currentTime, 
   peaks, 
   isLoading,
   onSeek, 
   className 
-}: WaveformProps) => {
+}, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [hoverTime, setHoverTime] = useState<number | null>(null);
@@ -31,9 +31,18 @@ export const Waveform = ({
     const container = containerRef.current;
     if (!container) return;
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect;
-      setDimensions({ width, height });
+    const updateDimensions = () => {
+      const { width, height } = container.getBoundingClientRect();
+      if (width > 0 && height > 0) {
+        setDimensions({ width, height });
+      }
+    };
+
+    // Initial measurement
+    updateDimensions();
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateDimensions();
     });
 
     resizeObserver.observe(container);
@@ -43,7 +52,7 @@ export const Waveform = ({
   // Draw waveform
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || dimensions.width === 0 || peaks.length === 0) return;
+    if (!canvas || dimensions.width === 0 || dimensions.height === 0) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -61,79 +70,104 @@ export const Waveform = ({
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
 
+    // If no peaks, draw placeholder bars
+    const displayPeaks = peaks.length > 0 ? peaks : generatePlaceholderPeaks(100);
+    
     const progress = duration > 0 ? currentTime / duration : 0;
     const progressX = progress * width;
 
     // Waveform settings
-    const barWidth = Math.max(2, (width / peaks.length) - 1);
-    const gap = 1;
+    const barWidth = Math.max(2, (width / displayPeaks.length) - 1);
     const centerY = height / 2;
-    const maxBarHeight = (height / 2) - 20; // Leave space for time markers
+    const maxBarHeight = (height / 2) - 16; // Leave space for time markers
 
-    // Colors from CSS variables
-    const playedColor = getComputedStyle(document.documentElement).getPropertyValue('--waveform').trim();
-    const unplayedColor = getComputedStyle(document.documentElement).getPropertyValue('--waveform-inactive').trim();
+    // Get colors from CSS variables
+    const computedStyle = getComputedStyle(document.documentElement);
+    const playedColorRaw = computedStyle.getPropertyValue('--waveform').trim();
+    const unplayedColorRaw = computedStyle.getPropertyValue('--waveform-inactive').trim();
+    
+    // Fallback colors if CSS variables are empty
+    const playedColor = playedColorRaw ? `hsl(${playedColorRaw})` : 'hsl(38, 92%, 50%)';
+    const unplayedColor = unplayedColorRaw ? `hsl(${unplayedColorRaw})` : 'hsl(0, 0%, 30%)';
 
     // Draw waveform bars
-    peaks.forEach((peak, i) => {
-      const x = (i / peaks.length) * width;
+    displayPeaks.forEach((peak, i) => {
+      const x = (i / displayPeaks.length) * width;
       const barHeight = Math.max(4, peak * maxBarHeight);
       
       const isPlayed = x <= progressX;
-      ctx.fillStyle = isPlayed ? `hsl(${playedColor})` : `hsl(${unplayedColor})`;
+      ctx.fillStyle = isPlayed ? playedColor : unplayedColor;
 
       // Draw mirrored bars (top and bottom from center)
       ctx.fillRect(x, centerY - barHeight, barWidth, barHeight);
       ctx.fillRect(x, centerY, barWidth, barHeight);
     });
 
+    // Draw center line
+    ctx.fillStyle = unplayedColor;
+    ctx.globalAlpha = 0.3;
+    ctx.fillRect(0, centerY - 0.5, width, 1);
+    ctx.globalAlpha = 1;
+
     // Draw playhead
-    if (progress > 0 && progress < 1) {
-      ctx.fillStyle = `hsl(${playedColor})`;
-      ctx.fillRect(progressX - 1, 10, 2, height - 20);
+    if (progress > 0 && progress <= 1 && duration > 0) {
+      ctx.fillStyle = playedColor;
+      ctx.fillRect(progressX - 1, 8, 2, height - 16);
       
       // Playhead cap
       ctx.beginPath();
-      ctx.arc(progressX, 10, 4, 0, Math.PI * 2);
+      ctx.arc(progressX, 8, 4, 0, Math.PI * 2);
       ctx.fill();
     }
 
     // Draw time markers
-    const markerCount = Math.ceil(duration / 30); // Every 30 seconds
-    const interval = duration > 180 ? 60 : duration > 60 ? 30 : 15; // Adjust interval based on duration
-    const actualMarkerCount = Math.floor(duration / interval);
-    
-    ctx.font = '10px Inter, system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    
-    for (let i = 0; i <= actualMarkerCount; i++) {
-      const time = i * interval;
-      const x = (time / duration) * width;
+    if (duration > 0) {
+      const interval = duration > 180 ? 60 : duration > 60 ? 30 : 15;
+      const actualMarkerCount = Math.floor(duration / interval);
       
-      // Don't draw markers too close to edges
-      if (x < 30 || x > width - 30) continue;
+      ctx.font = '10px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
       
-      const isPlayed = x <= progressX;
-      ctx.fillStyle = isPlayed ? `hsl(${playedColor})` : `hsla(${unplayedColor}, 0.7)`;
-      
-      // Tick mark
-      ctx.fillRect(x, height - 12, 1, 6);
-      
-      // Time label
-      ctx.fillText(formatSeconds(time), x, height - 2);
+      for (let i = 0; i <= actualMarkerCount; i++) {
+        const time = i * interval;
+        const x = (time / duration) * width;
+        
+        // Don't draw markers too close to edges
+        if (x < 25 || x > width - 25) continue;
+        
+        const isPlayed = x <= progressX;
+        ctx.fillStyle = isPlayed ? playedColor : unplayedColor;
+        ctx.globalAlpha = isPlayed ? 0.8 : 0.5;
+        
+        // Tick mark
+        ctx.fillRect(x, height - 10, 1, 5);
+        
+        // Time label
+        ctx.fillText(formatSeconds(time), x, height - 1);
+      }
+      ctx.globalAlpha = 1;
     }
 
     // Draw hover indicator
     if (hoverX !== null && hoverTime !== null) {
-      ctx.fillStyle = `hsl(${playedColor})`;
-      ctx.globalAlpha = 0.5;
-      ctx.fillRect(hoverX - 1, 10, 2, height - 20);
+      ctx.fillStyle = playedColor;
+      ctx.globalAlpha = 0.4;
+      ctx.fillRect(hoverX - 1, 8, 2, height - 16);
       ctx.globalAlpha = 1;
     }
 
   }, [peaks, currentTime, duration, dimensions, hoverX, hoverTime]);
 
+  const generatePlaceholderPeaks = (count: number): number[] => {
+    const peaks: number[] = [];
+    for (let i = 0; i < count; i++) {
+      peaks.push(0.1 + Math.random() * 0.2);
+    }
+    return peaks;
+  };
+
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (duration <= 0) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const percentage = x / rect.width;
@@ -149,6 +183,7 @@ export const Waveform = ({
   }, []);
 
   const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (duration <= 0) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const percentage = x / rect.width;
@@ -159,17 +194,9 @@ export const Waveform = ({
     return (
       <div className={cn('h-full flex items-center justify-center', className)}>
         <div className="flex flex-col items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span className="text-sm">Analyzing audio...</span>
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <span className="text-sm">Analyzing audio waveform...</span>
         </div>
-      </div>
-    );
-  }
-
-  if (peaks.length === 0) {
-    return (
-      <div className={cn('h-full flex items-center justify-center', className)}>
-        <span className="text-sm text-muted-foreground">No waveform data</span>
       </div>
     );
   }
@@ -177,20 +204,20 @@ export const Waveform = ({
   return (
     <div 
       ref={containerRef}
-      className={cn('h-full relative cursor-pointer select-none', className)}
+      className={cn('h-full w-full relative cursor-pointer select-none', className)}
       onClick={handleClick}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
     >
       <canvas 
         ref={canvasRef} 
-        className="w-full h-full"
+        className="absolute inset-0 w-full h-full"
       />
       
       {/* Hover tooltip */}
-      {hoverTime !== null && hoverX !== null && (
+      {hoverTime !== null && hoverX !== null && duration > 0 && (
         <div 
-          className="absolute bottom-16 px-2 py-1 bg-popover border border-border rounded text-xs font-mono shadow-lg pointer-events-none transform -translate-x-1/2"
+          className="absolute bottom-14 px-2 py-1 bg-popover border border-border rounded text-xs font-mono shadow-lg pointer-events-none transform -translate-x-1/2 z-10"
           style={{ left: hoverX }}
         >
           {formatSeconds(hoverTime)}
@@ -198,4 +225,6 @@ export const Waveform = ({
       )}
     </div>
   );
-};
+});
+
+Waveform.displayName = 'Waveform';
