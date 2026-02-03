@@ -1,0 +1,46 @@
+/* TEAM */
+  Creator: SyncLyric Studio Team
+  Contact: hello@synclyricstudio.com
+  Twitter: @SyncLyricStudio
+  Location: Worldwide
+
+/* SITE */
+  Last update: 2025/02/02
+  Language: English
+  Doctype: HTML5
+  Standards: HTML5, CSS3, JavaScript (ES6+), TypeScript
+  Components: React, Vite, Tailwind CSS, Radix UI
+  IDE: VS Code
+
+/* TECHNOLOGIES */
+  Frontend: React 18, TypeScript, Vite
+  Styling: Tailwind CSS, CSS Modules
+  UI Components: Radix UI, shadcn/ui
+  State Management: React Hooks, TanStack Query
+  Icons: Lucide React
+  Testing: Vitest, Testing Library
+
+/* FEATURES */
+  - Audio waveform visualization
+  - Real-time lyrics synchronization
+  - Bulk lyrics import
+  - Multi-format export (LRC, SRT, VTT)
+  - Live preview mode
+  - Section-based organization
+  - Keyboard shortcuts
+  - Dark/Light theme support
+
+/* THANKS */
+  - React Team for the amazing framework
+  - Vercel for Vite
+  - Tailwind Labs for Tailwind CSS
+  - Radix UI for accessible components
+  - All open source contributors
+
+/* SITE MAP */
+  Homepage: /
+  Features: /features
+  About: /about
+  Contact: /contact
+  Privacy: /privacy
+  Terms: /terms

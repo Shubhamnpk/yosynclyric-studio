@@ -1,0 +1,122 @@
+{
+  "name": "yoSyncLyric Studio - Professional Lyrics Synchronization",
+  "short_name": "YoSyncLyric Studio",
+  "description": "Create perfectly synchronized lyrics with SyncLyric Studio. Professional audio waveform visualization, bulk import, real-time preview, and export to LRC, SRT, and VTT formats.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#eab308",
+  "orientation": "any",
+  "scope": "/",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": [
+    "multimedia",
+    "music",
+    "productivity",
+    "utilities"
+  ],
+  "icons": [
+    {
+      "src": "/favicon-16x16.png",
+      "sizes": "16x16",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any apple-touch-icon"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "SyncLyric Studio Desktop Interface"
+    },
+    {
+      "src": "/screenshot-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "SyncLyric Studio Mobile Interface"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Project",
+      "short_name": "New",
+      "description": "Create a new lyrics synchronization project",
+      "url": "/?action=new",
+      "icons": [
+        {
+          "src": "/favicon-32x32.png",
+          "sizes": "32x32"
+        }
+      ]
+    },
+    {
+      "name": "Import Lyrics",
+      "short_name": "Import",
+      "description": "Import existing lyrics file",
+      "url": "/?action=import",
+      "icons": [
+        {
+          "src": "/favicon-32x32.png",
+          "sizes": "32x32"
+        }
+      ]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+synclyric",
+      "url": "/?import=%s"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "/?action=open",
+      "accept": {
+        "application/json": [".json"],
+        "text/plain": [".lrc", ".txt"],
+        "text/vtt": [".vtt"],
+        "application/x-subrip": [".srt"]
+      }
+    }
+  ],
+  "share_target": {
+    "action": "/?action=share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "lyrics",
+          "accept": [".lrc", ".srt", ".vtt", ".txt", ".json"]
+        }
+      ]
+    }
+  }
+}

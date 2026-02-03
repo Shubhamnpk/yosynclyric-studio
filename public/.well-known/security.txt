@@ -1,0 +1,8 @@
+Contact: mailto:security@synclyricstudio.com
+Expires: 2026-02-02T23:59:59.000Z
+Encryption: https://synclyricstudio.com/pgp-key.txt
+Acknowledgments: https://synclyricstudio.com/security-acknowledgments
+Preferred-Languages: en
+Canonical: https://synclyricstudio.com/.well-known/security.txt
+Policy: https://synclyricstudio.com/security-policy
+Hiring: https://synclyricstudio.com/careers

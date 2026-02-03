@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <!-- Main gradient using app's primary/accent color (golden/amber) -->
+    <linearGradient id="mainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f59e0b;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#eab308;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ca8a04;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Secondary gradient for depth (purple from bridge section) -->
+    <linearGradient id="secondaryGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a855f7;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Gradient for the waveform -->
+    <linearGradient id="waveGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.95" />
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0.7" />
+    </linearGradient>
+    
+    <!-- Glow effect -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  
+  <!-- Background circle with main gradient -->
+  <circle cx="32" cy="32" r="30" fill="url(#mainGradient)" filter="url(#glow)" />
+  
+  <!-- Inner decorative ring with secondary gradient -->
+  <circle cx="32" cy="32" r="26" fill="none" stroke="url(#secondaryGradient)" stroke-width="1.5" opacity="0.6" />
+  
+  <!-- Musical note symbol -->
+  <g transform="translate(20, 14)">
+    <!-- Note head -->
+    <ellipse cx="8" cy="28" rx="7" ry="5" fill="white" transform="rotate(-20 8 28)" />
+    
+    <!-- Note stem -->
+    <rect x="13" y="4" width="2" height="24" fill="white" rx="1" />
+    
+    <!-- Note flag -->
+    <path d="M15 4 Q 22 8 22 16 Q 20 12 15 10" fill="white" />
+    
+    <!-- Second note (smaller) -->
+    <ellipse cx="20" cy="24" rx="5" ry="3.5" fill="white" transform="rotate(-20 20 24)" opacity="0.85" />
+    <rect x="23" y="6" width="1.5" height="18" fill="white" rx="0.75" opacity="0.85" />
+  </g>
+  
+  <!-- Waveform visualization at bottom with section colors -->
+  <g transform="translate(12, 44)">
+    <!-- Verse (green) -->
+    <rect x="0" y="6" width="3" height="8" rx="1.5" fill="#22c55e" opacity="0.9" />
+    <rect x="5" y="3" width="3" height="14" rx="1.5" fill="#22c55e" opacity="0.9" />
+    
+    <!-- Chorus (golden/amber - primary) -->
+    <rect x="10" y="1" width="3" height="18" rx="1.5" fill="url(#waveGradient)" />
+    <rect x="15" y="4" width="3" height="12" rx="1.5" fill="url(#waveGradient)" />
+    <rect x="20" y="0" width="3" height="20" rx="1.5" fill="url(#waveGradient)" />
+    
+    <!-- Bridge (purple) -->
+    <rect x="25" y="2" width="3" height="16" rx="1.5" fill="#a855f7" opacity="0.9" />
+    <rect x="30" y="5" width="3" height="10" rx="1.5" fill="#a855f7" opacity="0.9" />
+    
+    <!-- Outro (red) -->
+    <rect x="35" y="1" width="3" height="18" rx="1.5" fill="#ef4444" opacity="0.9" />
+    <rect x="40" y="3" width="3" height="14" rx="1.5" fill="#ef4444" opacity="0.9" />
+  </g>
+  
+  <!-- Sync arrows (indicating synchronization) -->
+  <g transform="translate(46, 18)" opacity="0.95">
+    <!-- Clockwise arrow -->
+    <path d="M 6 0 A 6 6 0 1 1 0 6" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" />
+    <polygon points="0,6 -2,3 2,3" fill="white" />
+    
+    <!-- Counter-clockwise arrow -->
+    <path d="M 6 12 A 6 6 0 1 1 12 6" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" />
+    <polygon points="12,6 15,4 15,8" fill="white" />
+  </g>
+</svg>
