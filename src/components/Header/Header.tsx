@@ -19,6 +19,9 @@ import {
   Languages,
   Trash2,
   Settings2,
+  ArrowLeft,
+  Save,
+  Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -28,6 +31,10 @@ interface HeaderProps {
   onToggleDark: () => void;
   onToggleRTL: () => void;
   onClearAllTimestamps: () => void;
+  onBackToDashboard?: () => void;
+  onSave?: () => void;
+  isSaving?: boolean;
+  isDirty?: boolean;
 }
 
 const exportFormats: { value: ExportFormat; label: string; description: string }[] = [
@@ -43,6 +50,10 @@ export const Header = ({
   onToggleDark,
   onToggleRTL,
   onClearAllTimestamps,
+  onBackToDashboard,
+  onSave,
+  isSaving = false,
+  isDirty = false,
 }: HeaderProps) => {
   const handleExport = (format: ExportFormat) => {
     downloadLyrics(project, format);
@@ -50,8 +61,18 @@ export const Header = ({
 
   return (
     <header className="h-14 flex items-center justify-between px-4 border-b border-panel-border bg-panel">
-      {/* Logo */}
+      {/* Left side - Logo and optional back button */}
       <div className="flex items-center gap-3">
+        {onBackToDashboard && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onBackToDashboard}
+            className="mr-1"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        )}
         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-primary-foreground">
           <Music2 className="h-5 w-5" />
         </div>
@@ -75,6 +96,37 @@ export const Header = ({
 
       {/* Actions */}
       <div className="flex items-center gap-2">
+        {/* Save Button */}
+        {onSave && (
+          <Button
+            variant={isDirty ? "default" : "outline"}
+            size="sm"
+            onClick={onSave}
+            disabled={isSaving || !isDirty}
+            className={cn(isDirty && "animate-pulse")}
+          >
+            {isSaving ? (
+              <>
+                <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Saving...
+              </>
+            ) : isDirty ? (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Save*
+              </>
+            ) : (
+              <>
+                <Check className="h-4 w-4 mr-2 text-green-500" />
+                Saved
+              </>
+            )}
+          </Button>
+        )}
+
         {/* Settings */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
