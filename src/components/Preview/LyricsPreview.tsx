@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { LyricLine } from '@/types/lyrics';
+import { LyricLine, SyncMode } from '@/types/lyrics';
 import { formatTimestamp } from '@/utils/formatTime';
 import { cn } from '@/lib/utils';
 import { SectionBadge } from '@/components/LyricsEditor/SectionBadge';
@@ -9,17 +9,21 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 interface LyricsPreviewProps {
   lines: LyricLine[];
   activeLineId: string | null;
+  activeWordIndex: number | null;
   isRTL: boolean;
   title: string;
   artist: string;
+  syncMode: SyncMode;
 }
 
 export const LyricsPreview = ({
   lines,
   activeLineId,
+  activeWordIndex,
   isRTL,
   title,
   artist,
+  syncMode,
 }: LyricsPreviewProps) => {
   const activeRef = useRef<HTMLDivElement>(null);
 
@@ -54,7 +58,7 @@ export const LyricsPreview = ({
       {/* Preview content */}
       <ScrollArea className="flex-1">
         <div
-          className="p-6 space-y-4"
+          className="p-6 space-y-6"
           dir={isRTL ? 'rtl' : 'ltr'}
         >
           {nonEmptyLines.length === 0 ? (
@@ -85,21 +89,43 @@ export const LyricsPreview = ({
                       <SectionBadge section={line.section} />
                     </div>
                   )}
-                  <p
+                  <div
                     className={cn(
-                      'text-lg leading-relaxed transition-colors duration-300',
-                      isActive && 'text-primary font-medium text-xl',
-                      isPast && 'text-muted-foreground',
-                      !isActive && !isPast && 'text-foreground/70'
+                      'text-lg leading-relaxed transition-all duration-300 flex flex-wrap gap-x-[0.25em]',
+                      isActive && 'text-xl',
+                      isPast ? 'text-muted-foreground' : 'text-foreground/70'
                     )}
                   >
-                    {line.text}
-                  </p>
+                    {syncMode === 'word' && line.words && line.words.length > 0 ? (
+                      line.words.map((word, wIdx) => {
+                        const isWordActive = isActive && activeWordIndex === wIdx;
+                        const isWordPast = isPast || (isActive && activeWordIndex !== null && wIdx < activeWordIndex);
+
+                        return (
+                          <span
+                            key={wIdx}
+                            className={cn(
+                              'transition-colors duration-200',
+                              isWordActive && 'text-primary font-bold scale-110',
+                              isWordPast && 'text-muted-foreground',
+                              !isWordActive && !isWordPast && isActive && 'text-foreground'
+                            )}
+                          >
+                            {word.text}
+                          </span>
+                        );
+                      })
+                    ) : (
+                      <span className={cn(isActive && 'text-primary font-medium text-xl')}>
+                        {line.text}
+                      </span>
+                    )}
+                  </div>
                   {(line.startTime !== null || line.endTime !== null) && (
                     <span
                       className={cn(
-                        'timestamp-display text-xs mt-1 block opacity-50',
-                        isActive && 'opacity-100'
+                        'timestamp-display text-[10px] mt-1 block opacity-30 font-mono',
+                        isActive && 'opacity-70'
                       )}
                     >
                       {formatTimestamp(line.startTime)} → {formatTimestamp(line.endTime)}
@@ -114,3 +140,4 @@ export const LyricsPreview = ({
     </div>
   );
 };
+

@@ -1,5 +1,5 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
-import { AudioState } from '@/types/lyrics';
+import { LyricLine, AudioState, SyncMode } from '@/types/lyrics';
 import { Waveform } from './Waveform';
 import { formatSeconds } from '@/utils/formatTime';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,8 @@ import {
   Volume2,
   VolumeX,
   Music,
+  Zap,
+  Gauge,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -29,7 +31,11 @@ interface AudioControlsProps {
   onForward: (seconds?: number) => void;
   onCaptureStartTime: () => void;
   onCaptureEndTime: () => void;
+  onSetPlaybackRate: (rate: number) => void;
   selectedLineText: string;
+  syncMode?: SyncMode;
+  onWordSync?: (wordIndex: number, startTime: number, endTime: number) => void;
+  selectedLine?: LyricLine;
 }
 
 export const AudioControls = ({
@@ -45,11 +51,16 @@ export const AudioControls = ({
   onForward,
   onCaptureStartTime,
   onCaptureEndTime,
+  onSetPlaybackRate,
   selectedLineText,
+  syncMode = 'line',
+  onWordSync,
+  selectedLine,
 }: AudioControlsProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
+  const [syncingWordIndex, setSyncingWordIndex] = useState<number | null>(null);
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -59,6 +70,28 @@ export const AudioControls = ({
       onLoadAudio(url);
     }
   }, [onSetAudioFile, onLoadAudio]);
+
+  const handleWordSync = useCallback(() => {
+    if (!onWordSync || !selectedLine || syncingWordIndex === null) return;
+
+    const words = selectedLine.text.split(/\s+/).filter(w => w.length > 0);
+    const currentTimeMs = audioState.currentTime * 1000;
+
+    // Set end time for current word and start time for next
+    const currentWordStartTime = selectedLine.words?.[syncingWordIndex]?.startTime || currentTimeMs;
+    onWordSync(syncingWordIndex, currentWordStartTime, currentTimeMs);
+
+    if (syncingWordIndex < words.length - 1) {
+      setSyncingWordIndex(syncingWordIndex + 1);
+    } else {
+      setSyncingWordIndex(null);
+    }
+  }, [onWordSync, selectedLine, syncingWordIndex, audioState.currentTime]);
+
+  const startWordSync = useCallback(() => {
+    if (syncMode !== 'word' || !selectedLine) return;
+    setSyncingWordIndex(0);
+  }, [syncMode, selectedLine]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -82,7 +115,17 @@ export const AudioControls = ({
       switch (e.code) {
         case 'Space':
           e.preventDefault();
-          onPlayPause();
+          if (syncingWordIndex !== null) {
+            handleWordSync();
+          } else {
+            onPlayPause();
+          }
+          break;
+        case 'Enter':
+          if (syncMode === 'word' && syncingWordIndex === null) {
+            e.preventDefault();
+            startWordSync();
+          }
           break;
         case 'ArrowLeft':
           e.preventDefault();
@@ -117,9 +160,10 @@ export const AudioControls = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onPlayPause, onRewind, onForward, onCaptureStartTime, onCaptureEndTime]);
+  }, [onPlayPause, onRewind, onForward, onCaptureStartTime, onCaptureEndTime, syncingWordIndex, handleWordSync, startWordSync, syncMode]);
 
   const showWaveform = audioState.isLoaded || isLoadingWaveform;
+  const words = selectedLine?.text.split(/\s+/).filter(w => w.length > 0) || [];
 
   return (
     <div className="h-full flex flex-col bg-panel rounded-lg border border-panel-border">
@@ -134,7 +178,7 @@ export const AudioControls = ({
             onSeek={onSeek}
           />
         ) : (
-          <div 
+          <div
             className="h-full flex items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors"
             onClick={() => fileInputRef.current?.click()}
           >
@@ -177,13 +221,13 @@ export const AudioControls = ({
             >
               <SkipBack className="h-4 w-4" />
             </Button>
-            
+
             <Button
               variant="default"
               size="icon"
               onClick={onPlayPause}
               disabled={!audioState.isLoaded}
-              className="h-10 w-10"
+              className="h-10 w-10 relative"
               title="Play/Pause (Space)"
             >
               {audioState.isPlaying ? (
@@ -192,7 +236,7 @@ export const AudioControls = ({
                 <Play className="h-5 w-5 ml-0.5" />
               )}
             </Button>
-            
+
             <Button
               variant="ghost"
               size="icon"
@@ -204,33 +248,61 @@ export const AudioControls = ({
             </Button>
           </div>
 
-          {/* Timestamp capture buttons */}
+          {/* Sync Controls */}
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={onCaptureStartTime}
-              disabled={!audioState.isLoaded}
-              title="Set start time ([ or Shift+S)"
-            >
-              <span className="kbd mr-1 text-[10px]">[</span>
-              Start
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={onCaptureEndTime}
-              disabled={!audioState.isLoaded}
-              title="Set end time (] or Shift+E)"
-            >
-              <span className="kbd mr-1 text-[10px]">]</span>
-              End
-            </Button>
+            {syncMode === 'line' ? (
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={onCaptureStartTime}
+                  disabled={!audioState.isLoaded}
+                  className="bg-primary/10 hover:bg-primary/20 text-primary border-none"
+                >
+                  <span className="kbd mr-1.5 opacity-50">[</span>
+                  Start
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={onCaptureEndTime}
+                  disabled={!audioState.isLoaded}
+                  className="bg-primary/10 hover:bg-primary/20 text-primary border-none"
+                >
+                  <span className="kbd mr-1.5 opacity-50">]</span>
+                  End
+                </Button>
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
+                {syncingWordIndex === null ? (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={startWordSync}
+                    disabled={!audioState.isLoaded || !selectedLine}
+                    className="bg-accent hover:bg-accent/90 text-accent-foreground"
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    Sync Words (Enter)
+                  </Button>
+                ) : (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleWordSync}
+                    className="bg-primary animate-pulse"
+                  >
+                    Next Word: {words[syncingWordIndex]} (Space)
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Current line preview */}
           <div className="flex-1 min-w-0 px-4">
-            <p className="text-sm text-muted-foreground truncate">
+            <p className="text-sm text-muted-foreground truncate font-medium">
               {selectedLineText || 'Select a line to sync'}
             </p>
           </div>
@@ -261,6 +333,28 @@ export const AudioControls = ({
             />
           </div>
 
+          {/* Playback Speed */}
+          <div className="flex items-center gap-1.5 flex-shrink-0 bg-muted/30 p-1.5 rounded-md border border-panel-border/50">
+            <Gauge className="h-3.5 w-3.5 text-muted-foreground mr-1" />
+            {[0.25, 0.5, 0.75, 1.0].map((rate) => (
+              <Button
+                key={rate}
+                variant={audioState.playbackRate === rate ? "default" : "ghost"}
+                size="sm"
+                className={cn(
+                  "h-7 px-2.5 text-[10px] font-bold transition-all",
+                  audioState.playbackRate === rate
+                    ? "bg-primary text-primary-foreground shadow-md"
+                    : "text-muted-foreground hover:bg-muted"
+                )}
+                onClick={() => onSetPlaybackRate(rate)}
+              >
+                {rate}x
+              </Button>
+            ))}
+          </div>
+
+
           {/* Upload button */}
           <Button
             variant="outline"
@@ -284,3 +378,4 @@ export const AudioControls = ({
     </div>
   );
 };
+

@@ -1,4 +1,4 @@
-import { ExportFormat, LyricsProject } from '@/types/lyrics';
+import { ExportFormat, LyricsProject, SyncMode } from '@/types/lyrics';
 import { downloadLyrics } from '@/utils/exportLyrics';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,16 +19,30 @@ import {
   Languages,
   Trash2,
   Settings2,
+  ListMusic,
+  Zap,
+  Undo2,
+  Redo2,
+  Save,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface HeaderProps {
   project: LyricsProject;
   isDark: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
   onToggleDark: () => void;
   onToggleRTL: () => void;
   onClearAllTimestamps: () => void;
+  onToggleSyncMode: (mode: SyncMode) => void;
+  onBackup: () => void;
+  leftElement?: React.ReactNode;
 }
+
 
 const exportFormats: { value: ExportFormat; label: string; description: string }[] = [
   { value: 'lrc', label: 'LRC', description: 'Music players' },
@@ -40,9 +54,16 @@ const exportFormats: { value: ExportFormat; label: string; description: string }
 export const Header = ({
   project,
   isDark,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
   onToggleDark,
   onToggleRTL,
   onClearAllTimestamps,
+  onToggleSyncMode,
+  onBackup,
+  leftElement,
 }: HeaderProps) => {
   const handleExport = (format: ExportFormat) => {
     downloadLyrics(project, format);
@@ -52,6 +73,7 @@ export const Header = ({
     <header className="h-14 flex items-center justify-between px-4 border-b border-panel-border bg-panel">
       {/* Logo */}
       <div className="flex items-center gap-3">
+        {leftElement}
         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-primary-foreground">
           <Music2 className="h-5 w-5" />
         </div>
@@ -60,18 +82,49 @@ export const Header = ({
         </div>
       </div>
 
-      {/* Center - Keyboard shortcuts hint */}
-      <div className="hidden md:flex items-center gap-4 text-sm text-muted-foreground">
-        <span>
-          <kbd className="kbd">Space</kbd> Play/Pause
-        </span>
-        <span>
-          <kbd className="kbd">⇧</kbd>+<kbd className="kbd">Space</kbd> Sync
-        </span>
-        <span>
-          <kbd className="kbd">←</kbd><kbd className="kbd">→</kbd> Seek
-        </span>
+      {/* Undo/Redo & Mode Switcher */}
+      <div className="flex items-center gap-6">
+        <div className="flex items-center gap-1 bg-muted/30 p-1 rounded-md">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={onUndo}
+            disabled={!canUndo}
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo2 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={onRedo}
+            disabled={!canRedo}
+            title="Redo (Ctrl+Y)"
+          >
+            <Redo2 className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <Tabs
+          value={project.syncMode}
+          onValueChange={(v) => onToggleSyncMode(v as SyncMode)}
+          className="w-[180px]"
+        >
+          <TabsList className="grid w-full grid-cols-2 h-9">
+            <TabsTrigger value="line" className="text-[10px] uppercase font-bold tracking-wider gap-1.5">
+              <ListMusic className="h-3.5 w-3.5" />
+              Line
+            </TabsTrigger>
+            <TabsTrigger value="word" className="text-[10px] uppercase font-bold tracking-wider gap-1.5">
+              <Zap className="h-3.5 w-3.5" />
+              Word
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
+
 
       {/* Actions */}
       <div className="flex items-center gap-2">
@@ -85,12 +138,12 @@ export const Header = ({
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>Settings</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            
+
             {/* Theme toggle */}
             <div className="flex items-center justify-between px-2 py-2">
               <div className="flex items-center gap-2">
                 {isDark ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-                <Label htmlFor="dark-mode" className="font-normal">Dark mode</Label>
+                <Label htmlFor="dark-mode" className="font-normal text-sm">Dark mode</Label>
               </div>
               <Switch
                 id="dark-mode"
@@ -98,12 +151,12 @@ export const Header = ({
                 onCheckedChange={onToggleDark}
               />
             </div>
-            
+
             {/* RTL toggle */}
             <div className="flex items-center justify-between px-2 py-2">
               <div className="flex items-center gap-2">
                 <Languages className="h-4 w-4" />
-                <Label htmlFor="rtl-mode" className="font-normal">RTL mode</Label>
+                <Label htmlFor="rtl-mode" className="font-normal text-sm">RTL mode</Label>
               </div>
               <Switch
                 id="rtl-mode"
@@ -113,7 +166,12 @@ export const Header = ({
             </div>
 
             <DropdownMenuSeparator />
-            
+
+            <DropdownMenuItem onClick={onBackup}>
+              <Save className="h-4 w-4 mr-2" />
+              Create manual backup
+            </DropdownMenuItem>
+
             <DropdownMenuItem
               onClick={onClearAllTimestamps}
               className="text-destructive focus:text-destructive"
@@ -127,7 +185,7 @@ export const Header = ({
         {/* Export */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="default" size="sm">
+            <Button variant="default" size="sm" className="shadow-md">
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
@@ -141,8 +199,8 @@ export const Header = ({
                 onClick={() => handleExport(format.value)}
               >
                 <div className="flex flex-col">
-                  <span className="font-medium">{format.label}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="font-medium text-sm">{format.label}</span>
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
                     {format.description}
                   </span>
                 </div>
@@ -154,3 +212,4 @@ export const Header = ({
     </header>
   );
 };
+
