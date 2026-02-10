@@ -8,6 +8,8 @@ import { AudioControls } from '@/components/AudioPlayer/AudioControls';
 import { LyricsPreview } from '@/components/Preview/LyricsPreview';
 import { LyricsProject } from '@/types/lyrics';
 import { KaraokeMode } from '@/components/Preview/KaraokeMode';
+import { MetadataEditorDialog } from '@/components/LyricsEditor/MetadataEditorDialog';
+import { VideoExportDialog } from '@/components/VideoExport/VideoExportDialog';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { ArrowLeft } from 'lucide-react';
@@ -22,6 +24,8 @@ export const SyncLyricsApp = ({ initialProject }: SyncLyricsAppProps) => {
   const settings = getSettings();
   const [isDark, setIsDark] = useState(settings.theme === 'dark' || (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches));
   const [isKaraokeMode, setIsKaraokeMode] = useState(false);
+  const [isMetadataOpen, setIsMetadataOpen] = useState(false);
+  const [isVideoExportOpen, setIsVideoExportOpen] = useState(false);
   const navigate = useNavigate();
 
 
@@ -130,6 +134,12 @@ export const SyncLyricsApp = ({ initialProject }: SyncLyricsAppProps) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
+  const handlePausePlayback = useCallback(() => {
+    if (audioState.isPlaying) {
+      togglePlayPause();
+    }
+  }, [audioState.isPlaying, togglePlayPause]);
+
   const selectedLine = project.lines.find(l => l.id === selectedLineId);
 
   return (
@@ -149,6 +159,8 @@ export const SyncLyricsApp = ({ initialProject }: SyncLyricsAppProps) => {
         onToggleSyncMode={(mode) => updateProject({ syncMode: mode })}
         onBackup={() => createBackup(project)}
         onToggleKaraoke={() => setIsKaraokeMode(true)}
+        onToggleMetadata={() => setIsMetadataOpen(true)}
+        onExportVideo={() => setIsVideoExportOpen(true)}
         leftElement={
           <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="mr-2">
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -246,9 +258,22 @@ export const SyncLyricsApp = ({ initialProject }: SyncLyricsAppProps) => {
           audioUrl={project.audioUrl}
         />
       )}
+
+      {/* Metadata Editor Dialog */}
+      <MetadataEditorDialog
+        open={isMetadataOpen}
+        onOpenChange={setIsMetadataOpen}
+        project={project}
+        onUpdateProject={updateProject}
+      />
+
+      {/* Video Export Dialog */}
+      <VideoExportDialog
+        open={isVideoExportOpen}
+        onOpenChange={setIsVideoExportOpen}
+        project={project}
+        onPausePlayback={handlePausePlayback}
+      />
     </div>
   );
 };
-
-
-

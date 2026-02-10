@@ -21,6 +21,10 @@ export interface LyricsProject {
   id: string;
   title: string;
   artist: string;
+  album: string;
+  year: string;
+  genre: string;
+  coverArtUrl: string | null;
   lines: LyricLine[];
   audioFile: File | null;
   audioUrl: string | null;

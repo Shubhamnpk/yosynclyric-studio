@@ -210,14 +210,24 @@ export const useLyricsEditor = (initialProject: LyricsProject) => {
     const url = URL.createObjectURL(file);
     const updates: Partial<LyricsProject> = { audioFile: file, audioUrl: url };
 
-    // Auto extract title/artist if currently "Untitled" or empty
+    // Auto extract metadata if currently "Untitled" or empty
     if (project.title === 'Untitled' || !project.title.trim()) {
       try {
         const metadata = await mmb.parseBlob(file);
-        const { title, artist } = metadata.common;
+        const { title, artist, album, year, genre, picture } = metadata.common;
 
         if (title) updates.title = title;
         if (artist) updates.artist = artist;
+        if (album) updates.album = album;
+        if (year) updates.year = String(year);
+        if (genre && genre.length > 0) updates.genre = genre[0];
+
+        // Extract cover art
+        if (picture && picture.length > 0) {
+          const pic = picture[0];
+          const blob = new Blob([new Uint8Array(pic.data)], { type: pic.format });
+          updates.coverArtUrl = URL.createObjectURL(blob);
+        }
 
         // If metadata is still missing, fallback to filename
         if (!updates.title) {
@@ -243,10 +253,28 @@ export const useLyricsEditor = (initialProject: LyricsProject) => {
           updates.title = fileName.trim();
         }
       }
+    } else {
+      // Even if title is set, try to extract cover art and other missing fields
+      try {
+        const metadata = await mmb.parseBlob(file);
+        const { album, year, genre, picture } = metadata.common;
+
+        if (!project.album && album) updates.album = album;
+        if (!project.year && year) updates.year = String(year);
+        if (!project.genre && genre && genre.length > 0) updates.genre = genre[0];
+
+        if (!project.coverArtUrl && picture && picture.length > 0) {
+          const pic = picture[0];
+          const blob = new Blob([new Uint8Array(pic.data)], { type: pic.format });
+          updates.coverArtUrl = URL.createObjectURL(blob);
+        }
+      } catch (error) {
+        console.error('Error extracting additional metadata:', error);
+      }
     }
 
     updateProject(updates);
-  }, [project.title, updateProject]);
+  }, [project.title, project.album, project.year, project.genre, project.coverArtUrl, updateProject]);
 
 
 

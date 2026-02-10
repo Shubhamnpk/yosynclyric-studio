@@ -65,6 +65,11 @@ export const getAllProjects = (): LyricsProject[] => {
         const projects = JSON.parse(stored);
         return projects.map((p: any) => ({
             ...p,
+            // Ensure backward compatibility for new metadata fields
+            album: p.album || '',
+            year: p.year || '',
+            genre: p.genre || '',
+            coverArtUrl: p.coverArtUrl || null,
             createdAt: new Date(p.createdAt),
             updatedAt: new Date(p.updatedAt),
         }));
@@ -91,6 +96,10 @@ export const createNewProject = (id: string, title: string = 'Untitled'): Lyrics
         id,
         title,
         artist: '',
+        album: '',
+        year: '',
+        genre: '',
+        coverArtUrl: null,
         lines: [{
             id: Math.random().toString(36).substring(2, 9),
             text: '',
@@ -107,3 +116,4 @@ export const createNewProject = (id: string, title: string = 'Untitled'): Lyrics
         syncMode: settings.defaultSyncMode,
     };
 };
+

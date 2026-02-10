@@ -5,7 +5,7 @@ import { downloadLyrics } from '@/utils/exportLyrics';
 import { LyricsProject } from '@/types/lyrics';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Music2, Clock, Trash2, Search, MoreVertical, FileAudio, Settings2, Download, Edit3, FileText, ExternalLink } from 'lucide-react';
+import { PlusCircle, Music2, Clock, Trash2, Search, MoreVertical, FileAudio, Settings2, Download, Edit3, FileText, ExternalLink, Info } from 'lucide-react';
 
 import { formatDistanceToNow } from 'date-fns';
 import { Input } from '@/components/ui/input';
@@ -57,12 +57,16 @@ const Dashboard = () => {
                             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
                                 <Music2 className="h-6 w-6" />
                             </div>
-                            <h1 className="text-3xl font-bold tracking-tight">SyncLyric Studio</h1>
+                            <h1 className="text-3xl font-bold tracking-tight">Yosync Studio</h1>
                         </div>
                         <p className="text-muted-foreground text-lg">Create and manage your synchronized lyrics projects.</p>
                     </div>
 
                     <div className="flex items-center gap-3">
+                        <Button variant="outline" size="lg" onClick={() => navigate('/about')} className="rounded-full px-6">
+                            <Info className="mr-2 h-5 w-5" />
+                            About
+                        </Button>
                         <Button variant="outline" size="lg" onClick={() => navigate('/settings')} className="rounded-full px-6">
                             <Settings2 className="mr-2 h-5 w-5" />
                             Settings

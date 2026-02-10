@@ -25,6 +25,8 @@ import {
   Redo2,
   Save,
   Presentation,
+  Tag,
+  Film,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -42,6 +44,8 @@ interface HeaderProps {
   onToggleSyncMode: (mode: SyncMode) => void;
   onBackup: () => void;
   onToggleKaraoke: () => void;
+  onToggleMetadata: () => void;
+  onExportVideo: () => void;
   leftElement?: React.ReactNode;
 }
 
@@ -66,6 +70,8 @@ export const Header = ({
   onToggleSyncMode,
   onBackup,
   onToggleKaraoke,
+  onToggleMetadata,
+  onExportVideo,
   leftElement,
 }: HeaderProps) => {
   const handleExport = (format: ExportFormat) => {
@@ -81,7 +87,7 @@ export const Header = ({
           <Music2 className="h-5 w-5" />
         </div>
         <div>
-          <h1 className="font-semibold text-lg tracking-tight">SyncLyrics</h1>
+          <h1 className="font-semibold text-lg tracking-tight">Yosync Studio</h1>
         </div>
       </div>
 
@@ -131,6 +137,16 @@ export const Header = ({
 
       {/* Actions */}
       <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onToggleMetadata}
+          className="h-9 px-3 font-medium text-xs hidden sm:flex items-center gap-2"
+        >
+          <Tag className="h-4 w-4" />
+          Metadata
+        </Button>
+
         <Button
           variant="ghost"
           size="sm"
@@ -185,6 +201,11 @@ export const Header = ({
               Create manual backup
             </DropdownMenuItem>
 
+            <DropdownMenuItem onClick={onToggleMetadata} className="sm:hidden">
+              <Tag className="h-4 w-4 mr-2" />
+              Metadata Editor
+            </DropdownMenuItem>
+
             <DropdownMenuItem onClick={onToggleKaraoke} className="sm:hidden">
               <Presentation className="h-4 w-4 mr-2" />
               Karaoke Mode
@@ -224,6 +245,18 @@ export const Header = ({
                 </div>
               </DropdownMenuItem>
             ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onExportVideo} className="cursor-pointer">
+              <div className="flex items-center gap-2">
+                <Film className="h-4 w-4 text-primary" />
+                <div className="flex flex-col">
+                  <span className="font-medium text-sm">Video (MP4)</span>
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
+                    Social Media
+                  </span>
+                </div>
+              </div>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

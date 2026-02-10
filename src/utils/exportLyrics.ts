@@ -6,17 +6,18 @@ import { formatLRCTimestamp, formatSRTTimestamp, formatVTTTimestamp } from './fo
  */
 export const exportToLRC = (project: LyricsProject): string => {
   const lines: string[] = [];
-  
+
   // Metadata
   if (project.title) lines.push(`[ti:${project.title}]`);
   if (project.artist) lines.push(`[ar:${project.artist}]`);
+  if (project.album) lines.push(`[al:${project.album}]`);
   lines.push('');
-  
+
   // Lyrics - sorted by start time
   const sortedLines = [...project.lines]
     .filter(l => l.text.trim())
     .sort((a, b) => (a.startTime ?? Infinity) - (b.startTime ?? Infinity));
-  
+
   for (const line of sortedLines) {
     if (line.startTime !== null) {
       lines.push(`${formatLRCTimestamp(line.startTime)}${line.text}`);
@@ -24,7 +25,7 @@ export const exportToLRC = (project: LyricsProject): string => {
       lines.push(line.text);
     }
   }
-  
+
   return lines.join('\n');
 };
 
@@ -36,21 +37,21 @@ export const exportToSRT = (project: LyricsProject): string => {
   const sortedLines = [...project.lines]
     .filter(l => l.text.trim() && l.startTime !== null)
     .sort((a, b) => (a.startTime ?? 0) - (b.startTime ?? 0));
-  
+
   for (let i = 0; i < sortedLines.length; i++) {
     const line = sortedLines[i];
     const nextLine = sortedLines[i + 1];
-    
+
     const startTime = line.startTime!;
     // Use endTime if set, otherwise next line's start time, or current + 3 seconds
     const endTime = line.endTime ?? nextLine?.startTime ?? (startTime + 3000);
-    
+
     lines.push(`${i + 1}`);
     lines.push(`${formatSRTTimestamp(startTime)} --> ${formatSRTTimestamp(endTime)}`);
     lines.push(line.text);
     lines.push('');
   }
-  
+
   return lines.join('\n');
 };
 
@@ -59,28 +60,28 @@ export const exportToSRT = (project: LyricsProject): string => {
  */
 export const exportToVTT = (project: LyricsProject): string => {
   const lines: string[] = ['WEBVTT', ''];
-  
+
   if (project.title) {
     lines.push(`NOTE ${project.title} by ${project.artist || 'Unknown'}`, '');
   }
-  
+
   const sortedLines = [...project.lines]
     .filter(l => l.text.trim() && l.startTime !== null)
     .sort((a, b) => (a.startTime ?? 0) - (b.startTime ?? 0));
-  
+
   for (let i = 0; i < sortedLines.length; i++) {
     const line = sortedLines[i];
     const nextLine = sortedLines[i + 1];
-    
+
     const startTime = line.startTime!;
     // Use endTime if set, otherwise next line's start time, or current + 3 seconds
     const endTime = line.endTime ?? nextLine?.startTime ?? (startTime + 3000);
-    
+
     lines.push(`${formatVTTTimestamp(startTime)} --> ${formatVTTTimestamp(endTime)}`);
     lines.push(line.text);
     lines.push('');
   }
-  
+
   return lines.join('\n');
 };
 
@@ -89,11 +90,11 @@ export const exportToVTT = (project: LyricsProject): string => {
  */
 export const exportToTXT = (project: LyricsProject): string => {
   const lines: string[] = [];
-  
+
   if (project.title) lines.push(project.title);
   if (project.artist) lines.push(`by ${project.artist}`);
   if (project.title || project.artist) lines.push('');
-  
+
   for (const line of project.lines) {
     if (line.section) {
       lines.push(`[${line.section.charAt(0).toUpperCase() + line.section.slice(1)}]`);
@@ -102,7 +103,7 @@ export const exportToTXT = (project: LyricsProject): string => {
       lines.push(line.text);
     }
   }
-  
+
   return lines.join('\n');
 };
 
@@ -135,7 +136,7 @@ export const downloadLyrics = (project: LyricsProject, format: ExportFormat): vo
     vtt: 'text/vtt',
     txt: 'text/plain',
   };
-  
+
   const blob = new Blob([content], { type: mimeTypes[format] });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
