@@ -11,13 +11,16 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { FileText, Upload } from 'lucide-react';
+import { FileText, Upload, Music, Search } from 'lucide-react';
+
 
 interface BulkImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onImport: (text: string, replace: boolean) => void;
   hasExistingLyrics: boolean;
+  onImportLRC?: (text: string) => void;
+  onSearchOnline?: () => void;
 }
 
 export const BulkImportDialog = ({
@@ -25,9 +28,26 @@ export const BulkImportDialog = ({
   onOpenChange,
   onImport,
   hasExistingLyrics,
+  onImportLRC,
+  onSearchOnline,
 }: BulkImportDialogProps) => {
   const [text, setText] = useState('');
   const [replaceExisting, setReplaceExisting] = useState(true);
+
+  const handleLRCFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && onImportLRC) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const content = event.target?.result as string;
+        if (content) {
+          onImportLRC(content);
+          onOpenChange(false);
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
 
   const handleImport = () => {
     if (text.trim()) {
@@ -60,6 +80,34 @@ export const BulkImportDialog = ({
             className="min-h-[300px] font-mono text-sm"
             autoFocus
           />
+
+          {(onImportLRC || onSearchOnline) && (
+            <div className="flex gap-2">
+              {onImportLRC && (
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".lrc"
+                    onChange={handleLRCFileChange}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full"
+                  />
+                  <Button variant="outline" size="sm" className="w-full">
+                    <Music className="h-4 w-4 mr-2" />
+                    Upload LRC File
+                  </Button>
+                </div>
+              )}
+              {onSearchOnline && (
+                <Button variant="outline" size="sm" onClick={() => {
+                  onOpenChange(false);
+                  onSearchOnline();
+                }}>
+                  <Search className="h-4 w-4 mr-2" />
+                  Search Online
+                </Button>
+              )}
+            </div>
+          )}
 
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">

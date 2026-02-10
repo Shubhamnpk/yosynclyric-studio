@@ -24,6 +24,7 @@ import {
   Undo2,
   Redo2,
   Save,
+  Presentation,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -40,6 +41,7 @@ interface HeaderProps {
   onClearAllTimestamps: () => void;
   onToggleSyncMode: (mode: SyncMode) => void;
   onBackup: () => void;
+  onToggleKaraoke: () => void;
   leftElement?: React.ReactNode;
 }
 
@@ -63,6 +65,7 @@ export const Header = ({
   onClearAllTimestamps,
   onToggleSyncMode,
   onBackup,
+  onToggleKaraoke,
   leftElement,
 }: HeaderProps) => {
   const handleExport = (format: ExportFormat) => {
@@ -128,6 +131,16 @@ export const Header = ({
 
       {/* Actions */}
       <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onToggleKaraoke}
+          className="mr-2 h-9 px-3 font-medium text-xs hidden sm:flex items-center gap-2"
+        >
+          <Presentation className="h-4 w-4" />
+          Karaoke
+        </Button>
+
         {/* Settings */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -172,6 +185,11 @@ export const Header = ({
               Create manual backup
             </DropdownMenuItem>
 
+            <DropdownMenuItem onClick={onToggleKaraoke} className="sm:hidden">
+              <Presentation className="h-4 w-4 mr-2" />
+              Karaoke Mode
+            </DropdownMenuItem>
+
             <DropdownMenuItem
               onClick={onClearAllTimestamps}
               className="text-destructive focus:text-destructive"
@@ -212,4 +230,5 @@ export const Header = ({
     </header>
   );
 };
+
 

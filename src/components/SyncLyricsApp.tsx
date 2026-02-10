@@ -7,6 +7,7 @@ import { LyricsPanel } from '@/components/LyricsEditor/LyricsPanel';
 import { AudioControls } from '@/components/AudioPlayer/AudioControls';
 import { LyricsPreview } from '@/components/Preview/LyricsPreview';
 import { LyricsProject } from '@/types/lyrics';
+import { KaraokeMode } from '@/components/Preview/KaraokeMode';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { ArrowLeft } from 'lucide-react';
@@ -20,6 +21,7 @@ interface SyncLyricsAppProps {
 export const SyncLyricsApp = ({ initialProject }: SyncLyricsAppProps) => {
   const settings = getSettings();
   const [isDark, setIsDark] = useState(settings.theme === 'dark' || (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches));
+  const [isKaraokeMode, setIsKaraokeMode] = useState(false);
   const navigate = useNavigate();
 
 
@@ -131,7 +133,7 @@ export const SyncLyricsApp = ({ initialProject }: SyncLyricsAppProps) => {
   const selectedLine = project.lines.find(l => l.id === selectedLineId);
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden">
+    <div className="h-screen flex flex-col bg-background overflow-hidden font-sans">
       {/* Header */}
       <Header
         project={project}
@@ -146,6 +148,7 @@ export const SyncLyricsApp = ({ initialProject }: SyncLyricsAppProps) => {
         onClearAllTimestamps={clearAllTimestamps}
         onToggleSyncMode={(mode) => updateProject({ syncMode: mode })}
         onBackup={() => createBackup(project)}
+        onToggleKaraoke={() => setIsKaraokeMode(true)}
         leftElement={
           <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="mr-2">
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -182,6 +185,7 @@ export const SyncLyricsApp = ({ initialProject }: SyncLyricsAppProps) => {
                 setWordTiming(lineId, wordIndex, timeMs, timeMs + 500); // 500ms default duration
               }
             }}
+            audioDuration={audioState.duration}
           />
         </div>
 
@@ -224,8 +228,27 @@ export const SyncLyricsApp = ({ initialProject }: SyncLyricsAppProps) => {
           selectedLine={selectedLine}
         />
       </div>
+
+      {isKaraokeMode && (
+        <KaraokeMode
+          lines={project.lines}
+          activeLineId={activeLineId}
+          activeWordIndex={activeWordIndex}
+          currentTime={audioState.currentTime}
+          isPlaying={audioState.isPlaying}
+          onPlayPause={togglePlayPause}
+          onSeek={seek}
+          onClose={() => setIsKaraokeMode(false)}
+          title={project.title}
+          artist={project.artist}
+          duration={audioState.duration}
+          syncMode={project.syncMode}
+          audioUrl={project.audioUrl}
+        />
+      )}
     </div>
   );
 };
+
 
 

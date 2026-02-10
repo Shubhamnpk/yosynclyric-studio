@@ -1,12 +1,15 @@
-import { KeyboardEvent, useCallback, useState, useRef } from 'react';
+import { KeyboardEvent, useCallback, useState } from 'react';
 import { LyricLine, SectionType, LyricsProject } from '@/types/lyrics';
 import { LyricLineItem } from './LyricLineItem';
 import { BulkImportDialog } from './BulkImportDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, FileText, Upload, Music } from 'lucide-react';
+import { Plus, FileText, Upload, UploadCloud } from 'lucide-react';
+import { LRCLibSearchDialog } from './LRCLibSearchDialog';
+import { PublishDialog } from './PublishDialog';
 
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { toast } from 'sonner';
 
 interface LyricsPanelProps {
   project: LyricsProject;
@@ -26,6 +29,7 @@ interface LyricsPanelProps {
   onSplitWords: (id: string) => void;
 
   onWordClick: (lineId: string, wordIndex: number) => void;
+  audioDuration?: number;
 }
 
 export const LyricsPanel = ({
@@ -45,24 +49,14 @@ export const LyricsPanel = ({
   onImportLRC,
   onSplitWords,
   onWordClick,
+  audioDuration,
 }: LyricsPanelProps) => {
 
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const lrcInputRef = useRef<HTMLInputElement>(null);
 
-  const handleLRCImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const text = event.target?.result as string;
-        if (text) onImportLRC(text);
-      };
-      reader.readAsText(file);
-    }
-    // Reset input
-    e.target.value = '';
-  };
+  const [lrcLibDialogOpen, setLrcLibDialogOpen] = useState(false);
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false);
+
 
   const handleKeyDown = useCallback((lineId: string, e: KeyboardEvent<HTMLTextAreaElement>) => {
 
@@ -92,28 +86,21 @@ export const LyricsPanel = ({
             <h2 className="font-semibold text-lg">Lyrics Editor</h2>
           </div>
           <div className="flex items-center gap-2">
-            <input
-              type="file"
-              ref={lrcInputRef}
-              onChange={handleLRCImport}
-              accept=".lrc"
-              className="hidden"
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => lrcInputRef.current?.click()}
-            >
-              <Music className="h-4 w-4 mr-2" />
-              Import LRC
-            </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setImportDialogOpen(true)}
             >
               <Upload className="h-4 w-4 mr-2" />
-              Import Lyrics
+              Import
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPublishDialogOpen(true)}
+            >
+              <UploadCloud className="h-4 w-4 mr-2" />
+              Publish
             </Button>
           </div>
 
@@ -132,10 +119,10 @@ export const LyricsPanel = ({
             className="bg-background"
           />
         </div>
-      </div>
+      </div >
 
       {/* Lines */}
-      <ScrollArea className="flex-1">
+      < ScrollArea className="flex-1" >
         <div className="p-4 space-y-1">
           {project.lines.map((line) => (
             <div key={line.id} id={`line-${line.id}`}>
@@ -161,11 +148,11 @@ export const LyricsPanel = ({
           ))}
 
         </div>
-      </ScrollArea>
+      </ScrollArea >
 
 
       {/* Footer */}
-      <div className="flex-shrink-0 p-4 border-t border-panel-border">
+      < div className="flex-shrink-0 p-4 border-t border-panel-border" >
         <Button
           variant="outline"
           size="sm"
@@ -175,14 +162,38 @@ export const LyricsPanel = ({
           <Plus className="h-4 w-4 mr-2" />
           Add Line
         </Button>
-      </div>
+      </div >
 
       {/* Bulk Import Dialog */}
-      <BulkImportDialog
+      < BulkImportDialog
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
         onImport={onImportBulkLyrics}
         hasExistingLyrics={hasExistingLyrics}
+        onImportLRC={onImportLRC}
+        onSearchOnline={() => setLrcLibDialogOpen(true)}
+      />
+
+
+      <LRCLibSearchDialog
+        open={lrcLibDialogOpen}
+        onOpenChange={setLrcLibDialogOpen}
+        onImport={(lyrics, synced) => {
+          if (synced) {
+            onImportLRC(lyrics);
+          } else {
+            onImportBulkLyrics(lyrics, true);
+          }
+          toast('Lyrics imported successfully');
+        }}
+        initialQuery={project.title && project.artist ? `${project.title} ${project.artist}` : undefined}
+      />
+
+      <PublishDialog
+        open={publishDialogOpen}
+        onOpenChange={setPublishDialogOpen}
+        project={project}
+        audioDuration={audioDuration}
       />
     </div>
   );
