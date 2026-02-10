@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom';
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,11 +14,19 @@ import {
     Terminal,
     Calendar,
     Award,
-    CheckCircle2
+    CheckCircle2,
+    Github,
+    Globe,
+    Users,
+    Code,
+    Database,
+    Music,
+    Video,
+    FileText,
+    Palette
 } from "lucide-react";
 import changelogData from "@/config/changelog.json";
 import pkg from "../../package.json";
-import { cn } from "@/lib/utils";
 
 const AboutPage = () => {
     const navigate = useNavigate();
@@ -71,7 +78,7 @@ const AboutPage = () => {
                     {[
                         { icon: Rocket, label: "Status", value: "Stable" },
                         { icon: Calendar, label: "Released", value: "Feb 2026" },
-                        { icon: Terminal, label: "License", value: "Pro" },
+                        { icon: Terminal, label: "License", value: "MIT" },
                         { icon: Award, label: "Quality", value: "High-Fi" }
                     ].map((stat, i) => (
                         <Card key={i} className="bg-muted/30 border-none shadow-none text-center p-6 rounded-2xl">
@@ -101,6 +108,41 @@ const AboutPage = () => {
                                         <CheckCircle2 className="h-6 w-6" />
                                     </div>
                                     <span className="text-lg font-semibold tracking-tight leading-tight">{feature}</span>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                </section>
+
+                {/* Technology Stack */}
+                <section>
+                    <div className="flex items-center gap-3 mb-8">
+                        <div className="h-8 w-1 bg-primary rounded-full" />
+                        <h2 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+                            <Cpu className="h-6 w-6 text-primary" />
+                            Built with Modern Tech
+                        </h2>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {[
+                            { icon: Code, label: "React 18", desc: "Modern UI Framework" },
+                            { icon: Database, label: "TypeScript", desc: "Type Safety" },
+                            { icon: Palette, label: "Tailwind CSS", desc: "Styling" },
+                            { icon: Music, label: "Web Audio API", desc: "Audio Processing" },
+                            { icon: Video, label: "HTML5 Canvas", desc: "Video Rendering" },
+                            { icon: FileText, label: "FFmpeg.js", desc: "Video Encoding" },
+                            { icon: Users, label: "shadcn/ui", desc: "Component Library" },
+                            { icon: Globe, label: "Vite", desc: "Build Tool" }
+                        ].map((tech, idx) => (
+                            <Card key={idx} className="group overflow-hidden border-none bg-muted/40 hover:bg-muted/60 transition-all duration-300">
+                                <CardContent className="p-6 flex flex-col items-center text-center gap-3">
+                                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-500">
+                                        <tech.icon className="h-6 w-6" />
+                                    </div>
+                                    <div>
+                                        <div className="text-lg font-semibold tracking-tight">{tech.label}</div>
+                                        <div className="text-xs text-muted-foreground">{tech.desc}</div>
+                                    </div>
                                 </CardContent>
                             </Card>
                         ))}
@@ -156,6 +198,67 @@ const AboutPage = () => {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                </section>
+
+                {/* Open Source & Community */}
+                <section>
+                    <div className="flex items-center gap-3 mb-8">
+                        <div className="h-8 w-1 bg-primary rounded-full" />
+                        <h2 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+                            <Github className="h-6 w-6 text-primary" />
+                            Open Source & Community
+                        </h2>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Card className="border-none bg-gradient-to-br from-primary/10 to-primary/5">
+                            <CardContent className="p-6 space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <Github className="h-8 w-8 text-primary" />
+                                    <h3 className="text-xl font-bold">Contribute</h3>
+                                </div>
+                                <p className="text-muted-foreground">
+                                    Yosync Studio is open source and welcomes contributions from developers, designers, and users worldwide.
+                                </p>
+                                <div className="flex gap-2">
+                                    <Button variant="outline" asChild>
+                                        <a href="https://github.com/Shubhamnpk/synclyric-studio" target="_blank" rel="noopener noreferrer">
+                                            <Github className="mr-2 h-4 w-4" />
+                                            View on GitHub
+                                        </a>
+                                    </Button>
+                                    <Button asChild>
+                                        <a href="/contributing">
+                                            Read Contributing Guide
+                                        </a>
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="border-none bg-gradient-to-br from-green-500/10 to-green-500/5">
+                            <CardContent className="p-6 space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <ShieldCheck className="h-8 w-8 text-green-500" />
+                                    <h3 className="text-xl font-bold">License</h3>
+                                </div>
+                                <p className="text-muted-foreground">
+                                    Licensed under MIT License with special provisions for commercial use. Personal use and modification are always allowed.
+                                </p>
+                                <div className="flex gap-2">
+                                    <Button variant="outline" asChild>
+                                        <a href="/license">
+                                            View License
+                                        </a>
+                                    </Button>
+                                    <Button variant="outline" asChild>
+                                        <a href="mailto:shubhamnpk@gmail.com">
+                                            Request Commercial License
+                                        </a>
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
                 </section>
 
