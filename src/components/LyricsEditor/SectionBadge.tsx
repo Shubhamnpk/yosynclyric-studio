@@ -28,7 +28,7 @@ const sectionStyles: Record<NonNullable<SectionType>, string> = {
 
 export const SectionBadge = ({ section, className }: SectionBadgeProps) => {
   if (!section) return null;
-  
+
   return (
     <span className={cn('section-label', sectionStyles[section], className)}>
       {sectionLabels[section]}

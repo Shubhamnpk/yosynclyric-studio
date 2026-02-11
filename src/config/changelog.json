@@ -1,0 +1,52 @@
+{
+    "version": "0.1.0",
+    "build": "2026.02.10.01",
+    "releases": [
+        {
+            "date": "2026-02-10",
+            "version": "0.1.0",
+            "title": "The Video & Metadata Update",
+            "changes": [
+                {
+                    "type": "feature",
+                    "text": "Introduced Video Export (MP4) with high-quality Canvas recording and multiple resolutions."
+                },
+                {
+                    "type": "feature",
+                    "text": "Added Enhanced Metadata Editor for ID3 tags, cover art, and lyric embedding."
+                },
+                {
+                    "type": "improvement",
+                    "text": "Rebranded platform to Yosync Studio with updated UI and visual elements."
+                },
+                {
+                    "type": "feature",
+                    "text": "Implemented Smart Mixed-Mode sync rendering for video (Switching between word and line sync)."
+                }
+            ]
+        },
+        {
+            "date": "2026-02-09",
+            "version": "0.0.9",
+            "title": "Foundation & Import",
+            "changes": [
+                {
+                    "type": "feature",
+                    "text": "LRC File Import support added."
+                },
+                {
+                    "type": "security",
+                    "text": "Encrypted Local Storage for sensitive project data."
+                }
+            ]
+        }
+    ],
+    "features": [
+        "Precision Audio Waveform Editing",
+        "Real-time Karaoke Preview",
+        "Word-level and Line-level Synchronization",
+        "High-quality Video (MP4) Rendering",
+        "ID3 Metadata Tagging & Cover Art Management",
+        "Multi-format Export (LRC, SRT, VTT, TXT)"
+    ]
+}

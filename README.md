@@ -1,73 +1,152 @@
-# Welcome to your Lovable project
+# Yosync Studio
 
-## Project info
+A modern, web-based application for creating and editing synchronized lyrics (karaoke-style) with precision timing and professional features.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+![Yosync Studio Screenshot](https://github.com/Shubhamnpk/synclyric-studio/blob/main/public/placeholder.svg?raw=true)
 
-## How can I edit this code?
+## 🚀 Features
 
-There are several ways of editing your application.
+### Core Functionality
+- **Precision Audio Waveform Editing** - Visual waveform display for accurate timing
+- **Real-time Karaoke Preview** - Instant preview of synchronized lyrics
+- **Word-level and Line-level Synchronization** - Fine-grained control over timing
+- **Smart Mixed-Mode Sync** - Automatically switch between word and line sync for optimal results
 
-**Use Lovable**
+### Professional Tools
+- **High-quality Video (MP4) Rendering** - Export synchronized lyrics as video with multiple resolutions
+- **ID3 Metadata Tagging** - Complete metadata management with cover art support
+- **Multi-format Export** - LRC, SRT, VTT, and TXT formats supported
+- **LRC File Import** - Import existing synchronized lyrics
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### User Experience
+- **Modern UI/UX** - Clean, intuitive interface built with shadcn/ui and Tailwind CSS
+- **Dark/Light Theme** - System preference detection with manual override
+- **Real-time Collaboration** - Auto-save and backup functionality
+- **Keyboard Shortcuts** - Efficient workflow with undo/redo support
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🛠️ Tech Stack
 
-**Use your preferred IDE**
+- **Frontend**: React 18 + TypeScript
+- **Build Tool**: Vite
+- **Styling**: Tailwind CSS + shadcn/ui components
+- **State Management**: React Query (TanStack Query)
+- **Audio Processing**: Web Audio API with waveform visualization
+- **Video Rendering**: HTML5 Canvas with FFmpeg.js
+- **Storage**: Encrypted local storage with backup system
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## 📦 Installation
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Prerequisites
+- Node.js (version 18 or higher)
+- npm or pnpm package manager
 
-Follow these steps:
+### Quick Start
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/Shubhamnpk/synclyric-studio.git
+   cd synclyric-studio
+   ```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+2. **Install dependencies**
+   ```bash
+   # Using npm
+   npm install
+   
+   # Or using pnpm (recommended)
+   pnpm install
+   ```
 
-# Step 3: Install the necessary dependencies.
-npm i
+3. **Start development server**
+   ```bash
+   npm run dev
+   # or
+   pnpm dev
+   ```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+4. **Open your browser** and navigate to `http://localhost:5173`
+
+## 🎯 Usage
+
+### Creating a New Project
+1. Launch Yosync Studio
+2. Click "New Project" on the dashboard
+3. Upload your audio file (MP3, WAV, FLAC, etc.)
+4. Add your lyrics text
+5. Begin synchronizing with the audio
+
+### Synchronization Modes
+- **Word Mode**: Precise word-by-word timing
+- **Line Mode**: Line-by-line synchronization
+- **Mixed Mode**: Automatic switching between word and line sync
+
+### Export Options
+- **LRC**: Standard lyrics format
+- **SRT**: Subtitle format
+- **VTT**: Web video subtitle format
+- **TXT**: Plain text format
+- **MP4 Video**: High-quality video with synchronized lyrics
+
+## 📱 Browser Support
+
+Yosync Studio works in all modern browsers:
+- Chrome 90+
+- Firefox 88+
+- Safari 14+
+- Edge 90+
+
+## 🔧 Development
+
+### Available Scripts
+```bash
+npm run dev          # Start development server
+npm run build        # Build for production
+npm run preview      # Preview production build
+npm run lint         # Run ESLint
+npm test             # Run tests
+npm run test:watch   # Run tests in watch mode
 ```
 
-**Edit a file directly in GitHub**
+### Project Structure
+```
+src/
+├── components/          # React components
+├── pages/              # Page components
+├── hooks/              # Custom React hooks
+├── utils/              # Utility functions
+├── types/              # TypeScript type definitions
+├── services/           # API services
+└── config/             # Configuration files
+```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 🤝 Contributing
 
-**Use GitHub Codespaces**
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Development Setup
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests and linting
+5. Submit a pull request
 
-## What technologies are used for this project?
+## 📄 License
 
-This project is built with:
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 🙏 Acknowledgments
 
-## How can I deploy this project?
+- Built with [shadcn/ui](https://ui.shadcn.com/) for beautiful, accessible components
+- Powered by [Vite](https://vitejs.dev/) for fast development and builds
+- Audio processing powered by the Web Audio API
+- Video rendering with HTML5 Canvas and FFmpeg.js
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+## 📞 Support
 
-## Can I connect a custom domain to my Lovable project?
+For support and questions:
+- Create an [issue](https://github.com/Shubhamnpk/synclyric-studio/issues)
+- Join our [Discord community](https://discord.gg/example) (coming soon)
 
-Yes, you can!
+---
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+**Yosync Studio** - Professional lyrics synchronization made simple. 🎵

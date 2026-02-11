@@ -8,7 +8,9 @@ export const useAudioPlayer = () => {
     currentTime: 0,
     duration: 0,
     isLoaded: false,
+    playbackRate: 1.0,
   });
+
   const [waveformPeaks, setWaveformPeaks] = useState<number[]>([]);
   const [isLoadingWaveform, setIsLoadingWaveform] = useState(false);
 
@@ -20,16 +22,16 @@ export const useAudioPlayer = () => {
       const response = await fetch(url);
       const arrayBuffer = await response.arrayBuffer();
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      
+
       // Mix to mono if stereo
       const channelData = audioBuffer.numberOfChannels > 1
         ? mixToMono(audioBuffer)
         : audioBuffer.getChannelData(0);
-      
+
       const samplesCount = 200;
       const peaks: number[] = [];
       const blockSize = Math.floor(channelData.length / samplesCount);
-      
+
       for (let i = 0; i < samplesCount; i++) {
         const start = i * blockSize;
         let max = 0;
@@ -39,11 +41,11 @@ export const useAudioPlayer = () => {
         }
         peaks.push(max);
       }
-      
+
       // Normalize peaks to 0-1 range
       const maxPeak = Math.max(...peaks, 0.01);
       const normalizedPeaks = peaks.map(p => p / maxPeak);
-      
+
       setWaveformPeaks(normalizedPeaks);
       audioContext.close();
     } catch (err) {
@@ -58,7 +60,7 @@ export const useAudioPlayer = () => {
     const length = audioBuffer.length;
     const result = new Float32Array(length);
     const channels = audioBuffer.numberOfChannels;
-    
+
     for (let i = 0; i < length; i++) {
       let sum = 0;
       for (let c = 0; c < channels; c++) {
@@ -66,7 +68,7 @@ export const useAudioPlayer = () => {
       }
       result[i] = sum / channels;
     }
-    
+
     return result;
   };
 
@@ -74,10 +76,10 @@ export const useAudioPlayer = () => {
     if (audioRef.current) {
       audioRef.current.pause();
     }
-    
+
     // Reset waveform for new audio
     setWaveformPeaks([]);
-    
+
     const audio = new Audio(url);
     audioRef.current = audio;
 
@@ -152,6 +154,13 @@ export const useAudioPlayer = () => {
     seekRelative(seconds);
   }, [seekRelative]);
 
+  const setPlaybackRate = useCallback((rate: number) => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = rate;
+      setAudioState(prev => ({ ...prev, playbackRate: rate }));
+    }
+  }, []);
+
   useEffect(() => {
     return () => {
       if (audioRef.current) {
@@ -170,8 +179,10 @@ export const useAudioPlayer = () => {
     seek,
     rewind,
     forward,
+    setPlaybackRate,
     audioRef,
     waveformPeaks,
     isLoadingWaveform,
   };
 };
+
