@@ -62,18 +62,18 @@ const Dashboard = () => {
                         <p className="text-muted-foreground text-lg">Create and manage your synchronized lyrics projects.</p>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <Button variant="outline" size="lg" onClick={() => navigate('/about')} className="rounded-full px-6">
-                            <Info className="mr-2 h-5 w-5" />
-                            About
+                    <div className="flex items-center gap-2 md:gap-3">
+                        <Button variant="outline" size="lg" onClick={() => navigate('/about')} className="rounded-full px-3 md:px-6">
+                            <Info className="md:mr-2 h-5 w-5" />
+                            <span className="hidden md:inline">About</span>
                         </Button>
-                        <Button variant="outline" size="lg" onClick={() => navigate('/settings')} className="rounded-full px-6">
-                            <Settings2 className="mr-2 h-5 w-5" />
-                            Settings
+                        <Button variant="outline" size="lg" onClick={() => navigate('/settings')} className="rounded-full px-3 md:px-6">
+                            <Settings2 className="md:mr-2 h-5 w-5" />
+                            <span className="hidden md:inline">Settings</span>
                         </Button>
-                        <Button size="lg" onClick={handleCreateProject} className="rounded-full shadow-lg shadow-primary/20 px-8">
-                            <PlusCircle className="mr-2 h-5 w-5" />
-                            New Project
+                        <Button size="lg" onClick={handleCreateProject} className="rounded-full shadow-lg shadow-primary/20 px-4 md:px-8">
+                            <PlusCircle className="md:mr-2 h-5 w-5" />
+                            <span className="hidden sm:inline">New Project</span>
                         </Button>
                     </div>
 

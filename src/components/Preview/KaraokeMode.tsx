@@ -187,7 +187,7 @@ export const KaraokeMode = ({
 
             {/* ─── Top Header ────────────────────────────────────────── */}
             <div
-                className="absolute top-0 inset-x-0 p-8 flex justify-between items-center z-[110]"
+                className="absolute top-0 inset-x-0 p-4 md:p-8 flex justify-between items-center z-[110]"
                 style={{
                     opacity: showControls ? 1 : 0,
                     transform: showControls ? 'translateY(0)' : 'translateY(-16px)',
@@ -344,32 +344,32 @@ export const KaraokeMode = ({
                     </div>
 
                     {/* Transport */}
-                    <div className="flex items-center justify-center gap-12">
+                    <div className="flex items-center justify-center gap-6 md:gap-12">
                         <Button
                             variant="ghost" size="icon"
-                            className="h-16 w-16 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-all duration-300 transform hover:scale-110 active:scale-90"
+                            className="h-11 w-11 md:h-16 md:w-16 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-all duration-300 transform hover:scale-110 active:scale-90"
                             onClick={() => onSeek(Math.max(0, currentTime - 5))}
                         >
-                            <ChevronLeft className="h-10 w-10" />
+                            <ChevronLeft className="h-7 w-7 md:h-10 md:w-10" />
                         </Button>
 
                         <Button
                             size="icon"
-                            className="h-24 w-24 rounded-full bg-white text-black hover:bg-white/90 shadow-[0_0_50px_rgba(255,255,255,0.25)] transition-all duration-300 transform hover:scale-110 active:scale-90"
+                            className="h-16 w-16 md:h-24 md:w-24 rounded-full bg-white text-black hover:bg-white/90 shadow-[0_0_50px_rgba(255,255,255,0.25)] transition-all duration-300 transform hover:scale-110 active:scale-90"
                             onClick={onPlayPause}
                         >
                             {isPlaying
-                                ? <Pause className="h-12 w-12 fill-current" />
-                                : <Play className="h-12 w-12 fill-current ml-1.5" />
+                                ? <Pause className="h-8 w-8 md:h-12 md:w-12 fill-current" />
+                                : <Play className="h-8 w-8 md:h-12 md:w-12 fill-current ml-1" />
                             }
                         </Button>
 
                         <Button
                             variant="ghost" size="icon"
-                            className="h-16 w-16 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-all duration-300 transform hover:scale-110 active:scale-90"
+                            className="h-11 w-11 md:h-16 md:w-16 rounded-full hover:bg-white/10 text-white/40 hover:text-white transition-all duration-300 transform hover:scale-110 active:scale-90"
                             onClick={() => onSeek(Math.min(duration, currentTime + 5))}
                         >
-                            <ChevronRight className="h-10 w-10" />
+                            <ChevronRight className="h-7 w-7 md:h-10 md:w-10" />
                         </Button>
                     </div>
                 </div>

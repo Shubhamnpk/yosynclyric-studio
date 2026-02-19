@@ -32,25 +32,25 @@ export default function SettingsPage() {
     };
 
     return (
-        <div className="min-h-screen bg-background p-6">
+        <div className="min-h-screen bg-background p-4 md:p-6">
             <div className="max-w-3xl mx-auto space-y-6">
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                         <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
                             <ArrowLeft className="h-5 w-5" />
                         </Button>
-                        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+                        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Settings</h1>
                     </div>
                     <div className="flex items-center gap-2">
                         {isDirty && (
                             <Button variant="outline" size="sm" onClick={handleReset} className="gap-2">
                                 <RotateCcw className="h-4 w-4" />
-                                Reset
+                                <span className="hidden sm:inline">Reset</span>
                             </Button>
                         )}
                         <Button size="sm" onClick={handleSave} disabled={!isDirty} className="gap-2">
                             <Save className="h-4 w-4" />
-                            Save Changes
+                            <span className="hidden sm:inline">Save Changes</span>
                         </Button>
                     </div>
                 </div>
@@ -66,7 +66,7 @@ export default function SettingsPage() {
                             <CardDescription>Customize how the application looks for you.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div className="space-y-0.5">
                                     <Label>Theme</Label>
                                     <p className="text-sm text-muted-foreground">Select your preferred color theme.</p>
@@ -75,7 +75,7 @@ export default function SettingsPage() {
                                     value={settings.theme}
                                     onValueChange={(v: any) => updateSettings({ theme: v })}
                                 >
-                                    <SelectTrigger className="w-[180px]">
+                                    <SelectTrigger className="w-full sm:w-[180px]">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -110,7 +110,7 @@ export default function SettingsPage() {
                             <CardDescription>Default behavior for the lyric synchronization process.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div className="space-y-0.5">
                                     <Label>Default Sync Mode</Label>
                                     <p className="text-sm text-muted-foreground">Start new projects in this mode.</p>
@@ -119,7 +119,7 @@ export default function SettingsPage() {
                                     value={settings.defaultSyncMode}
                                     onValueChange={(v: any) => updateSettings({ defaultSyncMode: v })}
                                 >
-                                    <SelectTrigger className="w-[180px]">
+                                    <SelectTrigger className="w-full sm:w-[180px]">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -152,7 +152,7 @@ export default function SettingsPage() {
                             <CardDescription>Configure your default export preferences.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div className="space-y-0.5">
                                     <Label>Default Export Format</Label>
                                     <p className="text-sm text-muted-foreground">Preferred file format for downloads.</p>
@@ -161,7 +161,7 @@ export default function SettingsPage() {
                                     value={settings.exportFormat}
                                     onValueChange={(v: any) => updateSettings({ exportFormat: v })}
                                 >
-                                    <SelectTrigger className="w-[180px]">
+                                    <SelectTrigger className="w-full sm:w-[180px]">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -173,7 +173,7 @@ export default function SettingsPage() {
                                 </Select>
                             </div>
 
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div className="space-y-0.5">
                                     <Label>Auto-save Interval</Label>
                                     <p className="text-sm text-muted-foreground">How often to save changes to storage (seconds).</p>
@@ -182,7 +182,7 @@ export default function SettingsPage() {
                                     value={settings.autoSaveInterval.toString()}
                                     onValueChange={(v) => updateSettings({ autoSaveInterval: parseInt(v) })}
                                 >
-                                    <SelectTrigger className="w-[180px]">
+                                    <SelectTrigger className="w-full sm:w-[180px]">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>

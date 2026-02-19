@@ -79,51 +79,53 @@ export const LyricsPanel = ({
   return (
     <div className="h-full flex flex-col bg-panel rounded-lg border border-panel-border">
       {/* Header */}
-      <div className="flex-shrink-0 p-4 border-b border-panel-border">
+      <div className="flex-shrink-0 p-3 md:p-4 border-b border-panel-border">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
-            <h2 className="font-semibold text-lg">Lyrics Editor</h2>
+            <h2 className="font-semibold text-base md:text-lg">Lyrics Editor</h2>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 md:gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setImportDialogOpen(true)}
+              className="h-8 px-2 md:px-3"
             >
-              <Upload className="h-4 w-4 mr-2" />
-              Import
+              <Upload className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Import</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setPublishDialogOpen(true)}
+              className="h-8 px-2 md:px-3"
             >
-              <UploadCloud className="h-4 w-4 mr-2" />
-              Publish
+              <UploadCloud className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Publish</span>
             </Button>
           </div>
 
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3">
           <Input
             placeholder="Song Title"
             value={project.title}
             onChange={(e) => onUpdateProject({ title: e.target.value })}
-            className="bg-background"
+            className="bg-background h-9"
           />
           <Input
             placeholder="Artist Name"
             value={project.artist}
             onChange={(e) => onUpdateProject({ artist: e.target.value })}
-            className="bg-background"
+            className="bg-background h-9"
           />
         </div>
       </div >
 
       {/* Lines */}
-      < ScrollArea className="flex-1" >
-        <div className="p-4 space-y-1">
+      <ScrollArea className="flex-1">
+        <div className="p-2 md:p-4 space-y-1">
           {project.lines.map((line) => (
             <div key={line.id} id={`line-${line.id}`}>
               <LyricLineItem
@@ -152,7 +154,7 @@ export const LyricsPanel = ({
 
 
       {/* Footer */}
-      < div className="flex-shrink-0 p-4 border-t border-panel-border" >
+      <div className="flex-shrink-0 p-3 md:p-4 border-t border-panel-border">
         <Button
           variant="outline"
           size="sm"

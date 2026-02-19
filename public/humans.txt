@@ -1,5 +1,5 @@
 /* TEAM */
-  Creator: SyncLyric Studio Team
+  Creator: yoSyncLyric Studio Team
   Contact: hello@synclyricstudio.com
   Twitter: @SyncLyricStudio
   Location: Worldwide

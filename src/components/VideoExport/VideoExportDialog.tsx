@@ -202,34 +202,34 @@ export const VideoExportDialog = ({
 
     return (
         <Dialog open={open} onOpenChange={isExporting ? undefined : onOpenChange}>
-            <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
-                <DialogHeader className="p-6 pb-2">
-                    <DialogTitle className="flex items-center gap-2 text-xl">
+            <DialogContent className="sm:max-w-[800px] w-[95vw] max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
+                <DialogHeader className="p-4 md:p-6 pb-2">
+                    <DialogTitle className="flex items-center gap-2 text-lg md:text-xl">
                         <Film className="h-5 w-5 text-primary" />
                         Export Video
                     </DialogTitle>
-                    <DialogDescription>
+                    <DialogDescription className="text-xs md:text-sm">
                         Render your synchronized lyrics as a high-quality video.
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex-1 flex flex-col md:flex-row gap-6 p-6 pt-2 min-h-0 overflow-hidden">
+                <div className="flex-1 flex flex-col md:flex-row gap-4 md:gap-6 p-4 md:p-6 pt-2 min-h-0 overflow-y-auto">
                     {/* Preview Area */}
-                    <div className="flex-1 bg-black/90 rounded-xl overflow-hidden aspect-video relative flex items-center justify-center border border-white/10 shadow-2xl">
+                    <div className="flex-shrink-0 bg-black/90 rounded-xl overflow-hidden aspect-video relative flex items-center justify-center border border-white/10 shadow-2xl">
                         <canvas
                             ref={canvasRef}
                             className="w-full h-full object-contain"
                         />
                         {status === 'recording' && (
-                            <div className="absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 bg-red-500/90 text-white rounded-full text-xs font-bold animate-pulse">
-                                <div className="w-2 h-2 bg-white rounded-full" />
+                            <div className="absolute top-3 right-3 md:top-4 md:right-4 flex items-center gap-2 px-2 md:px-3 py-1 md:py-1.5 bg-red-500/90 text-white rounded-full text-[10px] md:text-xs font-bold animate-pulse">
+                                <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-white rounded-full" />
                                 REC
                             </div>
                         )}
                     </div>
 
                     {/* Controls Sidebar */}
-                    <div className="w-full md:w-64 flex flex-col gap-6 shrink-0">
+                    <div className="w-full md:w-64 flex flex-col gap-4 md:gap-6 shrink-0">
                         <div className="space-y-4">
                             <div className="space-y-2">
                                 <Label>Resolution</Label>

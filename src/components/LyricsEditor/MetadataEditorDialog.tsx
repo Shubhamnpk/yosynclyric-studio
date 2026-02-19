@@ -225,9 +225,9 @@ export const MetadataEditorDialog = ({
                             </DialogHeader>
                         </div>
 
-                        <div className="px-6 pb-6 space-y-6">
+                        <div className="px-4 md:px-6 pb-6 space-y-6">
                             {/* Cover Art + Title/Artist Row */}
-                            <div className="flex gap-5 items-start">
+                            <div className="flex flex-col sm:flex-row gap-5 items-center sm:items-start text-center sm:text-left">
                                 {/* Cover Art */}
                                 <div className="flex-shrink-0">
                                     <div
@@ -285,8 +285,8 @@ export const MetadataEditorDialog = ({
                                 </div>
 
                                 {/* Title & Artist */}
-                                <div className="flex-1 space-y-3">
-                                    <div>
+                                <div className="flex-1 w-full space-y-3">
+                                    <div className="text-left">
                                         <Label htmlFor="meta-title" className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
                                             <Music className="h-3 w-3" />
                                             Title
@@ -299,7 +299,7 @@ export const MetadataEditorDialog = ({
                                             className="bg-background/50 border-muted-foreground/20 focus:border-primary/50 h-10 text-base font-medium"
                                         />
                                     </div>
-                                    <div>
+                                    <div className="text-left">
                                         <Label htmlFor="meta-artist" className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
                                             <User className="h-3 w-3" />
                                             Artist
@@ -318,7 +318,7 @@ export const MetadataEditorDialog = ({
                             <Separator className="opacity-50" />
 
                             {/* Album, Year, Genre Row */}
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-4">
                                 <div>
                                     <Label htmlFor="meta-album" className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
                                         <Disc3 className="h-3 w-3" />
@@ -346,7 +346,7 @@ export const MetadataEditorDialog = ({
                                         maxLength={4}
                                     />
                                 </div>
-                                <div>
+                                <div className="xs:col-span-2 md:col-span-1">
                                     <Label htmlFor="meta-genre" className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
                                         <Tag className="h-3 w-3" />
                                         Genre
@@ -385,16 +385,16 @@ export const MetadataEditorDialog = ({
                             <Separator className="opacity-50" />
 
                             {/* Embed Lyrics Toggle */}
-                            <div className="bg-muted/30 rounded-xl p-4 space-y-3 border border-muted-foreground/10">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10">
+                            <div className="bg-muted/30 rounded-xl p-3 md:p-4 space-y-3 border border-muted-foreground/10">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 md:gap-3">
+                                        <div className="flex items-center justify-center w-8 h-8 md:w-9 md:h-9 rounded-lg bg-primary/10 flex-shrink-0">
                                             <Sparkles className="h-4 w-4 text-primary" />
                                         </div>
                                         <div>
                                             <p className="text-sm font-semibold">Embed Synced Lyrics</p>
-                                            <p className="text-xs text-muted-foreground">
-                                                Include LRC lyrics inside the MP3 file
+                                            <p className="text-[10px] md:text-xs text-muted-foreground">
+                                                Include LRC in MP3
                                             </p>
                                         </div>
                                     </div>
@@ -406,7 +406,7 @@ export const MetadataEditorDialog = ({
                                 </div>
 
                                 {/* Status indicators */}
-                                <div className="flex items-center gap-4 text-xs">
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] md:text-xs">
                                     <div className="flex items-center gap-1.5">
                                         {hasLyrics ? (
                                             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
@@ -414,7 +414,7 @@ export const MetadataEditorDialog = ({
                                             <XCircle className="h-3.5 w-3.5 text-muted-foreground/50" />
                                         )}
                                         <span className={hasLyrics ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground/50'}>
-                                            {project.lines.filter(l => l.text.trim()).length} lyrics lines
+                                            {project.lines.filter(l => l.text.trim()).length} lines
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-1.5">
@@ -424,7 +424,7 @@ export const MetadataEditorDialog = ({
                                             <XCircle className="h-3.5 w-3.5 text-muted-foreground/50" />
                                         )}
                                         <span className={hasSyncedLyrics ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground/50'}>
-                                            {project.lines.filter(l => l.startTime !== null).length} synced lines
+                                            {project.lines.filter(l => l.startTime !== null).length} synced
                                         </span>
                                     </div>
                                 </div>
@@ -432,24 +432,24 @@ export const MetadataEditorDialog = ({
 
                             {/* Info banner when no audio */}
                             {!hasAudioFile && (
-                                <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3.5">
+                                <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 md:p-3.5">
                                     <Info className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
                                     <div className="text-sm">
-                                        <p className="font-medium text-amber-600 dark:text-amber-400">No audio file loaded</p>
-                                        <p className="text-xs text-muted-foreground mt-0.5">
-                                            Load an MP3 file to embed metadata directly into the audio. You can still save metadata to your project.
+                                        <p className="font-medium text-amber-600 dark:text-amber-400 text-xs md:text-sm">No audio file loaded</p>
+                                        <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5 leading-tight">
+                                            Load an MP3 file to embed metadata directly into the audio.
                                         </p>
                                     </div>
                                 </div>
                             )}
 
                             {/* Action buttons */}
-                            <div className="flex items-center gap-3 pt-2">
+                            <div className="flex flex-col xs:flex-row items-center gap-3 pt-2">
                                 <Button
                                     variant="outline"
                                     onClick={handleSave}
                                     className={cn(
-                                        "flex-1 h-11 font-semibold transition-all duration-300",
+                                        "w-full xs:flex-1 h-11 font-semibold transition-all duration-300",
                                         isSaved && "border-emerald-500/50 text-emerald-600 dark:text-emerald-400"
                                     )}
                                 >
@@ -469,7 +469,7 @@ export const MetadataEditorDialog = ({
                                 <Button
                                     onClick={handleExport}
                                     disabled={!hasAudioFile || isExporting}
-                                    className="flex-1 h-11 font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all duration-300"
+                                    className="w-full xs:flex-1 h-11 font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all duration-300"
                                 >
                                     {isExporting ? (
                                         <>
@@ -479,7 +479,7 @@ export const MetadataEditorDialog = ({
                                     ) : (
                                         <>
                                             <FileAudio className="h-4 w-4 mr-2" />
-                                            Export with Metadata
+                                            Export Audio
                                         </>
                                     )}
                                 </Button>

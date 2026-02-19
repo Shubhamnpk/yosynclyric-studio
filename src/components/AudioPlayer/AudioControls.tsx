@@ -202,10 +202,10 @@ export const AudioControls = ({
       </div>
 
       {/* Controls */}
-      <div className="flex-shrink-0 p-4 border-t border-panel-border">
-        <div className="flex items-center gap-4">
+      <div className="flex-shrink-0 p-2 md:p-4 border-t border-panel-border">
+        <div className="flex flex-wrap items-center gap-2 md:gap-4">
           {/* Time display */}
-          <div className="flex-shrink-0 w-24 font-mono text-sm">
+          <div className="flex-shrink-0 font-mono text-xs md:text-sm">
             <span className="text-foreground">{formatSeconds(audioState.currentTime)}</span>
             <span className="text-muted-foreground"> / {formatSeconds(audioState.duration)}</span>
           </div>
@@ -218,6 +218,7 @@ export const AudioControls = ({
               onClick={() => onRewind(5)}
               disabled={!audioState.isLoaded}
               title="Rewind 5s (←)"
+              className="h-8 w-8 md:h-10 md:w-10"
             >
               <SkipBack className="h-4 w-4" />
             </Button>
@@ -227,13 +228,13 @@ export const AudioControls = ({
               size="icon"
               onClick={onPlayPause}
               disabled={!audioState.isLoaded}
-              className="h-10 w-10 relative"
+              className="h-9 w-9 md:h-10 md:w-10 relative"
               title="Play/Pause (Space)"
             >
               {audioState.isPlaying ? (
-                <Pause className="h-5 w-5" />
+                <Pause className="h-4 w-4 md:h-5 md:w-5" />
               ) : (
-                <Play className="h-5 w-5 ml-0.5" />
+                <Play className="h-4 w-4 md:h-5 md:w-5 ml-0.5" />
               )}
             </Button>
 
@@ -243,6 +244,7 @@ export const AudioControls = ({
               onClick={() => onForward(5)}
               disabled={!audioState.isLoaded}
               title="Forward 5s (→)"
+              className="h-8 w-8 md:h-10 md:w-10"
             >
               <SkipForward className="h-4 w-4" />
             </Button>
@@ -257,9 +259,9 @@ export const AudioControls = ({
                   size="sm"
                   onClick={onCaptureStartTime}
                   disabled={!audioState.isLoaded}
-                  className="bg-primary/10 hover:bg-primary/20 text-primary border-none"
+                  className="bg-primary/10 hover:bg-primary/20 text-primary border-none h-8 px-2 md:px-3"
                 >
-                  <span className="kbd mr-1.5 opacity-50">[</span>
+                  <span className="kbd mr-1 md:mr-1.5 opacity-50 hidden sm:inline">[</span>
                   Start
                 </Button>
                 <Button
@@ -267,9 +269,9 @@ export const AudioControls = ({
                   size="sm"
                   onClick={onCaptureEndTime}
                   disabled={!audioState.isLoaded}
-                  className="bg-primary/10 hover:bg-primary/20 text-primary border-none"
+                  className="bg-primary/10 hover:bg-primary/20 text-primary border-none h-8 px-2 md:px-3"
                 >
-                  <span className="kbd mr-1.5 opacity-50">]</span>
+                  <span className="kbd mr-1 md:mr-1.5 opacity-50 hidden sm:inline">]</span>
                   End
                 </Button>
               </>
@@ -281,34 +283,38 @@ export const AudioControls = ({
                     size="sm"
                     onClick={startWordSync}
                     disabled={!audioState.isLoaded || !selectedLine}
-                    className="bg-accent hover:bg-accent/90 text-accent-foreground"
+                    className="bg-accent hover:bg-accent/90 text-accent-foreground h-8"
                   >
-                    <Zap className="h-4 w-4 mr-2" />
-                    Sync Words (Enter)
+                    <Zap className="h-4 w-4 mr-1 md:mr-2" />
+                    <span className="hidden sm:inline">Sync Words</span>
+                    <span className="sm:hidden">Sync</span>
                   </Button>
                 ) : (
                   <Button
                     variant="default"
                     size="sm"
                     onClick={handleWordSync}
-                    className="bg-primary animate-pulse"
+                    className="bg-primary animate-pulse h-8"
                   >
-                    Next Word: {words[syncingWordIndex]} (Space)
+                    {words[syncingWordIndex]}
                   </Button>
                 )}
               </div>
             )}
           </div>
 
-          {/* Current line preview */}
-          <div className="flex-1 min-w-0 px-4">
+          {/* Current line preview - hidden on mobile */}
+          <div className="hidden md:flex flex-1 min-w-0 px-4">
             <p className="text-sm text-muted-foreground truncate font-medium">
               {selectedLineText || 'Select a line to sync'}
             </p>
           </div>
 
-          {/* Volume */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Spacer on mobile to push to next row */}
+          <div className="flex-1 md:hidden" />
+
+          {/* Volume - compact on mobile */}
+          <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
             <Button
               variant="ghost"
               size="icon"
@@ -333,16 +339,16 @@ export const AudioControls = ({
             />
           </div>
 
-          {/* Playback Speed */}
-          <div className="flex items-center gap-1.5 flex-shrink-0 bg-muted/30 p-1.5 rounded-md border border-panel-border/50">
+          {/* Playback Speed - compact on mobile */}
+          <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0 bg-muted/30 p-1.5 rounded-md border border-panel-border/50">
             <Gauge className="h-3.5 w-3.5 text-muted-foreground mr-1" />
-            {[0.25, 0.5, 0.75, 1.0].map((rate) => (
+            {[0.5, 0.75, 1.0].map((rate) => (
               <Button
                 key={rate}
                 variant={audioState.playbackRate === rate ? "default" : "ghost"}
                 size="sm"
                 className={cn(
-                  "h-7 px-2.5 text-[10px] font-bold transition-all",
+                  "h-7 px-2 md:px-2.5 text-[10px] font-bold transition-all",
                   audioState.playbackRate === rate
                     ? "bg-primary text-primary-foreground shadow-md"
                     : "text-muted-foreground hover:bg-muted"
@@ -354,16 +360,15 @@ export const AudioControls = ({
             ))}
           </div>
 
-
           {/* Upload button */}
           <Button
             variant="outline"
             size="sm"
             onClick={() => fileInputRef.current?.click()}
-            className="flex-shrink-0"
+            className="flex-shrink-0 h-8"
           >
-            <Upload className="h-4 w-4 mr-2" />
-            {audioState.isLoaded ? 'Change' : 'Upload'}
+            <Upload className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">{audioState.isLoaded ? 'Change' : 'Upload'}</span>
           </Button>
         </div>
       </div>

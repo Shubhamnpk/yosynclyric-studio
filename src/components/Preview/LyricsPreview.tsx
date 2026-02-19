@@ -3,7 +3,8 @@ import { LyricLine, SyncMode } from '@/types/lyrics';
 import { formatTimestamp } from '@/utils/formatTime';
 import { cn } from '@/lib/utils';
 import { SectionBadge } from '@/components/LyricsEditor/SectionBadge';
-import { Eye } from 'lucide-react';
+import { Eye, Presentation } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface LyricsPreviewProps {
   lines: LyricLine[];
@@ -13,6 +14,7 @@ interface LyricsPreviewProps {
   title: string;
   artist: string;
   syncMode: SyncMode;
+  onToggleKaraoke?: () => void;
 }
 
 export const LyricsPreview = ({
@@ -23,6 +25,7 @@ export const LyricsPreview = ({
   title,
   artist,
   syncMode,
+  onToggleKaraoke,
 }: LyricsPreviewProps) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const lineRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -110,12 +113,25 @@ export const LyricsPreview = ({
     <div className="h-full flex flex-col bg-panel rounded-lg border border-panel-border overflow-hidden">
       {/* Header */}
       <div className="flex-shrink-0 p-4 border-b border-panel-border">
-        <div className="flex items-center gap-2 mb-2">
-          <Eye className="h-5 w-5 text-primary" />
-          <h2 className="font-semibold text-lg">Live Preview</h2>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Eye className="h-5 w-5 text-primary" />
+            <h2 className="font-semibold text-lg">Live Preview</h2>
+          </div>
+          {onToggleKaraoke && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onToggleKaraoke}
+              className="h-8 gap-2 bg-primary/5 border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all duration-300 group"
+            >
+              <Presentation className="h-4 w-4 text-primary group-hover:text-primary-foreground" />
+              <span className="text-xs font-bold uppercase tracking-wider">Karaoke</span>
+            </Button>
+          )}
         </div>
         {(title || artist) && (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-sm text-muted-foreground truncate pr-20">
             {title && <span className="font-medium text-foreground">{title}</span>}
             {title && artist && <span> • </span>}
             {artist && <span>{artist}</span>}
@@ -132,13 +148,18 @@ export const LyricsPreview = ({
           dir={isRTL ? 'rtl' : 'ltr'}
         >
           {/* Top spacer — lets first line center */}
-          <div className="h-[5%] flex-shrink-0" />
+          <div className="h-[20%] flex-shrink-0" />
 
-          <div className="px-6 space-y-5">
+          <div className="px-6 space-y-5 pb-[40%]">
             {nonEmptyLines.length === 0 ? (
-              <p className="text-center text-muted-foreground py-12">
-                Start writing lyrics to see them here
-              </p>
+              <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
+                <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mb-2">
+                  <Eye className="h-8 w-8 text-muted-foreground/30" />
+                </div>
+                <p className="text-muted-foreground max-w-[200px] text-sm leading-relaxed">
+                  Start writing lyrics to see them here
+                </p>
+              </div>
             ) : (
               nonEmptyLines.map((line, index) => {
                 const isActive = line.id === activeLineId;
@@ -151,7 +172,8 @@ export const LyricsPreview = ({
                     ref={(el) => setLineRef(line.id, el)}
                     className="py-1"
                     style={{
-                      opacity: isActive ? 1 : isPast ? 0.8 : 0.9,
+                      opacity: isActive ? 1 : isPast ? 0.7 : 0.4,
+                      transform: isActive ? 'scale(1.02)' : 'scale(1)',
                       transition: 'opacity 600ms cubic-bezier(0.4, 0, 0.2, 1), transform 600ms cubic-bezier(0.4, 0, 0.2, 1)',
                     }}
                   >
@@ -163,7 +185,7 @@ export const LyricsPreview = ({
                     <div
                       className={cn(
                         'leading-relaxed flex flex-wrap gap-x-[0.25em]',
-                        isActive ? 'text-xl font-semibold' : 'text-lg',
+                        isActive ? 'text-2xl font-bold' : 'text-xl font-medium',
                       )}
                       style={{
                         color: isActive
@@ -172,7 +194,7 @@ export const LyricsPreview = ({
                             ? 'hsl(var(--muted-foreground))'
                             : 'hsl(var(--foreground) / 0.7)',
                         textShadow: isActive
-                          ? '0 0 20px hsl(var(--primary) / 0.3)'
+                          ? '0 0 30px hsl(var(--primary) / 0.4)'
                           : 'none',
                         transition: 'color 600ms cubic-bezier(0.4, 0, 0.2, 1), text-shadow 600ms cubic-bezier(0.4, 0, 0.2, 1), font-size 300ms ease',
                       }}
@@ -193,11 +215,13 @@ export const LyricsPreview = ({
                                     : isActive
                                       ? 'hsl(var(--foreground))'
                                       : undefined,
-                                fontWeight: isWordActive ? 700 : undefined,
+                                fontWeight: isWordActive ? 800 : undefined,
                                 textShadow: isWordActive
-                                  ? '0 0 16px hsl(var(--primary) / 0.4)'
+                                  ? '0 0 24px hsl(var(--primary) / 0.5)'
                                   : 'none',
-                                transition: 'color 300ms ease, font-weight 300ms ease, text-shadow 300ms ease',
+                                transform: isWordActive ? 'translateY(-2px)' : 'none',
+                                display: 'inline-block',
+                                transition: 'all 300ms cubic-bezier(0.34, 1.56, 0.64, 1)',
                               }}
                             >
                               {word.text}
@@ -210,9 +234,9 @@ export const LyricsPreview = ({
                     </div>
                     {(line.startTime !== null || line.endTime !== null) && (
                       <span
-                        className="timestamp-display text-[10px] mt-1 block font-mono"
+                        className="timestamp-display text-[10px] mt-1.5 block font-mono"
                         style={{
-                          opacity: isActive ? 0.8 : 0.6,
+                          opacity: isActive ? 0.8 : 0.4,
                           transition: 'opacity 600ms cubic-bezier(0.4, 0, 0.2, 1)',
                         }}
                       >
@@ -225,8 +249,7 @@ export const LyricsPreview = ({
             )}
           </div>
 
-          {/* Bottom spacer — lets last line center */}
-          <div className="h-[5%] flex-shrink-0" />
+          <div className="h-[10%] flex-shrink-0" />
         </div>
       </div>
     </div>
