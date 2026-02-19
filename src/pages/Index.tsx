@@ -1,4 +1,4 @@
-import { SyncLyricsApp } from '@/components/SyncLyricsApp';
+import { SyncLyricsApp } from '@/components/App';
 
 const Index = () => {
   return <SyncLyricsApp />;

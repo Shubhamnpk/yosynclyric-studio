@@ -61,7 +61,7 @@ export const BulkImportDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
@@ -77,14 +77,14 @@ export const BulkImportDialog = ({
             placeholder={`Paste your lyrics here...\n\nExample:\nHello, it's me\nI was wondering if after all these years\nYou'd like to meet`}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            className="min-h-[300px] font-mono text-sm"
+            className="min-h-[200px] md:min-h-[300px] font-mono text-sm"
             autoFocus
           />
 
           {(onImportLRC || onSearchOnline) && (
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               {onImportLRC && (
-                <div className="relative">
+                <div className="relative flex-1">
                   <input
                     type="file"
                     accept=".lrc"
@@ -98,7 +98,7 @@ export const BulkImportDialog = ({
                 </div>
               )}
               {onSearchOnline && (
-                <Button variant="outline" size="sm" onClick={() => {
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => {
                   onOpenChange(false);
                   onSearchOnline();
                 }}>
@@ -109,13 +109,13 @@ export const BulkImportDialog = ({
             </div>
           )}
 
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <span className="text-sm text-muted-foreground order-2 sm:order-1">
               {lineCount} {lineCount === 1 ? 'line' : 'lines'} detected
             </span>
 
             {hasExistingLyrics && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 order-1 sm:order-2">
                 <Checkbox
                   id="replace"
                   checked={replaceExisting}
@@ -129,11 +129,11 @@ export const BulkImportDialog = ({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          <Button variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleImport} disabled={!text.trim()}>
+          <Button className="w-full sm:w-auto" onClick={handleImport} disabled={!text.trim()}>
             <Upload className="h-4 w-4 mr-2" />
             Import {lineCount} {lineCount === 1 ? 'Line' : 'Lines'}
           </Button>

@@ -88,47 +88,50 @@ export const LyricLineItem = ({
   return (
     <div
       className={cn(
-        'lyric-line group flex items-start gap-2 animate-slide-in p-1 rounded-md transition-all duration-200',
+        'lyric-line group flex items-start gap-1 md:gap-2 animate-slide-in p-1 rounded-md transition-all duration-200',
         isSelected && 'bg-primary/5 ring-1 ring-primary/20',
         isActive && 'border-l-4 border-l-primary bg-primary/10'
       )}
       onClick={onSelect}
       dir={isRTL ? 'rtl' : 'ltr'}
     >
-      {/* Drag handle */}
-      <div className="flex-shrink-0 pt-2 opacity-0 group-hover:opacity-50 cursor-grab px-1">
+      {/* Drag handle - always slightly visible on mobile */}
+      <div className="flex-shrink-0 pt-2 opacity-10 md:opacity-0 group-hover:opacity-50 cursor-grab px-0.5 md:px-1">
         <GripVertical className="h-4 w-4" />
       </div>
 
-      {/* Timestamps - Start and End */}
-      <div className="flex-shrink-0 w-[140px] pt-2 flex flex-col gap-0.5">
-        <div className="flex items-center gap-1">
-          <span className="timestamp-display text-[11px] font-mono font-medium" title="Start time">
+      {/* Timestamps - Compact on mobile */}
+      <div className="flex-shrink-0 w-[100px] md:w-[140px] pt-1.5 md:pt-2 flex flex-col gap-0.5">
+        <div className="flex flex-wrap items-center gap-x-1 gap-y-0">
+          <span className="timestamp-display text-[10px] md:text-[11px] font-mono font-medium" title="Start time">
             {formatTimestamp(line.startTime)}
           </span>
-          <span className="text-muted-foreground text-[10px]">→</span>
-          <span className="timestamp-display text-[11px] font-mono font-medium" title="End time">
+          <span className="text-muted-foreground text-[9px] md:text-[10px]">→</span>
+          <span className="timestamp-display text-[10px] md:text-[11px] font-mono font-medium" title="End time">
             {formatTimestamp(line.endTime)}
           </span>
         </div>
         {hasWordTimestamps && (
-          <div className="flex items-center gap-1 text-[10px] text-accent font-medium">
+          <div className="flex items-center gap-1 text-[9px] md:text-[10px] text-accent font-medium">
             <Zap className="h-2.5 w-2.5" />
-            <span>Word sync: {syncedWordsCount}/{totalWordsCount}</span>
+            <span className="hidden xs:inline">Word sync: {syncedWordsCount}/{totalWordsCount}</span>
+            <span className="xs:hidden">{syncedWordsCount}/{totalWordsCount}</span>
           </div>
         )}
       </div>
 
-      {/* Section badge */}
-      <div className="flex-shrink-0 w-20">
+      {/* Section badge - Smaller on mobile */}
+      <div className="flex-shrink-0 w-12 md:w-20">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="h-7 min-w-[4rem] flex items-center justify-center">
+            <button className="h-7 min-w-[3rem] md:min-w-[4rem] flex items-center justify-center">
               {line.section ? (
-                <SectionBadge section={line.section} />
+                <div className="scale-90 md:scale-100">
+                  <SectionBadge section={line.section} />
+                </div>
               ) : (
-                <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                  + Section
+                <span className="text-[10px] md:text-xs text-muted-foreground opacity-30 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                  +Sec
                 </span>
               )}
             </button>
@@ -158,7 +161,7 @@ export const LyricLineItem = ({
                   onWordClick(i);
                 }}
                 className={cn(
-                  "px-2 py-0.5 rounded text-sm md:text-base border border-transparent cursor-pointer transition-all",
+                  "px-2 py-0.5 rounded text-xs md:text-sm lg:text-base border border-transparent cursor-pointer transition-all",
                   word.endTime > 0 ? "bg-primary/20 text-primary border-primary/30" : "bg-panel border-panel-border text-foreground/70 hover:bg-muted",
                   isSelected && "border-primary/20"
                 )}
@@ -189,7 +192,7 @@ export const LyricLineItem = ({
             onKeyDown={handleKeyDown}
             placeholder="Enter lyrics..."
             className={cn(
-              'w-full bg-transparent resize-none outline-none py-2 transition-all',
+              'w-full bg-transparent resize-none outline-none py-1 md:py-2 transition-all',
               'placeholder:text-muted-foreground/30',
               'text-sm md:text-base leading-relaxed',
               isActive && 'font-medium',
@@ -209,59 +212,55 @@ export const LyricLineItem = ({
         )}
       </div>
 
-      {/* Actions */}
-      <div className="flex-shrink-0 flex items-center gap-1 pt-2 opacity-0 group-hover:opacity-100 transition-opacity pr-2">
+      {/* Actions - Always partially visible on mobile, icon sizes adjusted */}
+      <div className="flex-shrink-0 flex items-center gap-0.5 md:gap-1 pt-1 opacity-20 md:opacity-0 group-hover:opacity-100 transition-opacity pr-1 md:pr-2">
         {syncMode === 'word' && !isDivided && line.text && (
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-accent"
+            className="h-6 w-6 md:h-7 md:w-7 text-accent"
             onClick={(e) => {
               e.stopPropagation();
               onSplitWords();
             }}
-            title="Divide into words"
           >
-            <Scissors className="h-4 w-4" />
+            <Scissors className="h-3.5 w-3.5 md:h-4 md:w-4" />
           </Button>
         )}
         {hasTimestamps && (
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 hover:bg-muted"
+            className="h-6 w-6 md:h-7 md:w-7 hover:bg-muted"
             onClick={(e) => {
               e.stopPropagation();
               onTimestampClear();
             }}
-            title="Clear timestamps"
           >
-            <Clock className="h-3.5 w-3.5" />
+            <Clock className="h-3 w-3 md:h-3.5 md:w-3.5" />
           </Button>
         )}
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 hover:bg-muted"
+          className="h-6 w-6 md:h-7 md:w-7 hover:bg-muted"
           onClick={(e) => {
             e.stopPropagation();
             onDuplicate();
           }}
-          title="Duplicate line"
         >
-          <Copy className="h-3.5 w-3.5" />
+          <Copy className="h-3 w-3 md:h-3.5 md:w-3.5" />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+          className="h-6 w-6 md:h-7 md:w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
           onClick={(e) => {
             e.stopPropagation();
             onDelete();
           }}
-          title="Delete line"
         >
-          <Trash2 className="h-3.5 w-3.5" />
+          <Trash2 className="h-3 w-3 md:h-3.5 md:w-3.5" />
         </Button>
 
       </div>

@@ -1,7 +1,30 @@
 {
-    "version": "0.1.0",
-    "build": "2026.02.10.01",
+    "version": "0.1.1",
+    "build": "2026.02.19.01",
     "releases": [
+        {
+            "date": "2026-02-19",
+            "version": "0.1.1",
+            "title": "Performance & Community Sharing",
+            "changes": [
+                {
+                    "type": "performance",
+                    "text": "Ultra-fast Proof-of-Work (PoW) solver using multi-threaded Web Workers (up to 10x faster cracking)."
+                },
+                {
+                    "type": "improvement",
+                    "text": "Refined LRCLIB Publish system with real-time status tracking and non-blocking background processing."
+                },
+                {
+                    "type": "fix",
+                    "text": "Resolved UI component conflicts and TypeScript errors in the Search & Import dialogs."
+                },
+                {
+                    "type": "improvement",
+                    "text": "Universal Mobile Optimization: Optimized layouts, font-scaling, and touch interactions across all major dialogs and editors."
+                }
+            ]
+        },
         {
             "date": "2026-02-10",
             "version": "0.1.0",
@@ -47,6 +70,7 @@
         "Word-level and Line-level Synchronization",
         "High-quality Video (MP4) Rendering",
         "ID3 Metadata Tagging & Cover Art Management",
-        "Multi-format Export (LRC, SRT, VTT, TXT)"
+        "Multi-format Export (LRC, SRT, VTT, TXT)",
+        "Mobile-First Responsive Interface"
     ]
 }

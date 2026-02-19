@@ -97,37 +97,70 @@ export const LrcLibApi = {
     },
 
     async solveChallenge(prefix: string, target: string): Promise<string> {
-        let nonce = 0;
-        while (true) {
-            const input = prefix + nonce.toString();
-            // Use subtle crypto for performance
-            const encoder = new TextEncoder();
-            const data = encoder.encode(input);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return new Promise((resolve) => {
+            const numWorkers = Math.max(1, navigator.hardwareConcurrency || 4);
+            const workers: Worker[] = [];
+            let solved = false;
 
-            if (hashHex.startsWith(target)) {
-                return `${prefix}:${nonce}:${hashHex}`;
-                // Note: The documentation might specify what the token format is. 
-                // Wait, the docs say: "The solution to this challenge (a nonce) is used to create a Publish Token"
-                // Usually it's just the nonce or the combined string. 
-                // Let's re-read carefully or valididate.
-                // The doc says: "Submit the nonce as the X-Publish-Token header." or similar?
-                // Actually, often these APIs follow a specific pattern. 
-                // Let's check if I can find more info on the token format.
-                // Re-reading docs snippet: "The solution to this challenge (a nonce) is used to create a Publish Token"
-                // It likely means the token is `prefix:nonce` or just `nonce`.
-                // However, another source says: "token = prefix + ':' + nonce"
-                // Let's assume it IS `prefix:nonce`.
-                // Wait, if I look at similar services (like verifying PoW), usually you send the nonce.
-                // But the python client for lrclib uses `prefix + ":" + nonce`.
-                // I will try `prefix + ":" + nonce`. 
+            const workerCode = `
+                onmessage = async (e) => {
+                    const { prefix, target, startNonce, stepSize } = e.data;
+                    let nonce = startNonce;
+                    const encoder = new TextEncoder();
+                    const targetLen = target.length;
+                    
+                    // Pre-compute hex table for faster conversion
+                    const hexTab = new Array(256);
+                    for (let i = 0; i < 256; i++) {
+                        hexTab[i] = i.toString(16).padStart(2, '0');
+                    }
+
+                    while (true) {
+                        const input = prefix + nonce;
+                        const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(input));
+                        const hashArray = new Uint8Array(hashBuffer);
+                        
+                        let hashHex = '';
+                        // Only convert as many bytes as needed to check the target
+                        const bytesToConvert = Math.ceil(targetLen / 2);
+                        for (let i = 0; i < bytesToConvert; i++) {
+                            hashHex += hexTab[hashArray[i]];
+                        }
+                        
+                        if (hashHex.startsWith(target)) {
+                            postMessage(nonce);
+                            return;
+                        }
+                        nonce += stepSize;
+                    }
+                };
+            `;
+
+            const blob = new Blob([workerCode], { type: 'application/javascript' });
+            const workerUrl = URL.createObjectURL(blob);
+
+            const terminateAll = () => {
+                workers.forEach(w => w.terminate());
+                URL.revokeObjectURL(workerUrl);
+            };
+
+            for (let i = 0; i < numWorkers; i++) {
+                const worker = new Worker(workerUrl);
+                worker.onmessage = (e) => {
+                    if (!solved) {
+                        solved = true;
+                        terminateAll();
+                        resolve(`${prefix}:${e.data}`);
+                    }
+                };
+                worker.postMessage({
+                    prefix,
+                    target,
+                    startNonce: i,
+                    stepSize: numWorkers
+                });
+                workers.push(worker);
             }
-            nonce++;
-            if (nonce % 1000 === 0) {
-                await new Promise(r => setTimeout(r, 0)); // Yield to main thread
-            }
-        }
+        });
     }
 };

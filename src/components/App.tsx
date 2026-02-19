@@ -12,8 +12,9 @@ import { MetadataEditorDialog } from '@/components/LyricsEditor/MetadataEditorDi
 import { VideoExportDialog } from '@/components/VideoExport/VideoExportDialog';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, FileText, Eye } from 'lucide-react';
 import { getSettings, saveSettings } from '@/utils/settingsStorage';
+import { cn } from '@/lib/utils';
 
 
 interface SyncLyricsAppProps {
@@ -26,6 +27,7 @@ export const SyncLyricsApp = ({ initialProject }: SyncLyricsAppProps) => {
   const [isKaraokeMode, setIsKaraokeMode] = useState(false);
   const [isMetadataOpen, setIsMetadataOpen] = useState(false);
   const [isVideoExportOpen, setIsVideoExportOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('editor');
   const navigate = useNavigate();
 
 
@@ -163,16 +165,50 @@ export const SyncLyricsApp = ({ initialProject }: SyncLyricsAppProps) => {
         onExportVideo={() => setIsVideoExportOpen(true)}
         leftElement={
           <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="mr-2">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Dashboard
+            <ArrowLeft className="w-4 h-4 md:mr-2" />
+            <span className="hidden md:inline">Dashboard</span>
           </Button>
         }
       />
 
+      {/* Mobile Tab Switcher */}
+      <div className="md:hidden flex-shrink-0 px-3 pt-2">
+        <div className="flex bg-muted/50 rounded-lg p-1 gap-1">
+          <button
+            onClick={() => setMobileTab('editor')}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-all",
+              mobileTab === 'editor'
+                ? "bg-background shadow-sm text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <FileText className="h-4 w-4" />
+            Editor
+          </button>
+          <button
+            onClick={() => setMobileTab('preview')}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-all",
+              mobileTab === 'preview'
+                ? "bg-background shadow-sm text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Eye className="h-4 w-4" />
+            Preview
+          </button>
+        </div>
+      </div>
+
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left panel - Lyrics Editor */}
-        <div className="w-1/2 p-3 overflow-hidden">
+        <div className={cn(
+          "p-3 overflow-hidden",
+          "md:w-1/2 md:block",
+          mobileTab === 'editor' ? "w-full block" : "hidden"
+        )}>
           <LyricsPanel
             project={project}
             selectedLineId={selectedLineId}
@@ -192,19 +228,20 @@ export const SyncLyricsApp = ({ initialProject }: SyncLyricsAppProps) => {
 
             onWordClick={(lineId, wordIndex) => {
               if (audioState.isLoaded) {
-                // Set word timing at current playback time
                 const timeMs = audioState.currentTime * 1000;
-                setWordTiming(lineId, wordIndex, timeMs, timeMs + 500); // 500ms default duration
+                setWordTiming(lineId, wordIndex, timeMs, timeMs + 500);
               }
             }}
             audioDuration={audioState.duration}
           />
         </div>
 
-
-
         {/* Right panel - Preview */}
-        <div className="w-1/2 p-3 pl-0 overflow-hidden">
+        <div className={cn(
+          "p-3 md:pl-0 overflow-hidden",
+          "md:w-1/2 md:block",
+          mobileTab === 'preview' ? "w-full block" : "hidden"
+        )}>
           <LyricsPreview
             lines={project.lines}
             activeLineId={activeLineId}
@@ -213,6 +250,7 @@ export const SyncLyricsApp = ({ initialProject }: SyncLyricsAppProps) => {
             title={project.title}
             artist={project.artist}
             syncMode={project.syncMode}
+            onToggleKaraoke={() => setIsKaraokeMode(true)}
           />
         </div>
       </div>

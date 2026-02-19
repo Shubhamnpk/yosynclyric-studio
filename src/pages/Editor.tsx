@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { getProjectById, createNewProject } from '@/utils/projectStorage';
-import { SyncLyricsApp } from '@/components/SyncLyricsApp';
+import { SyncLyricsApp } from '@/components/App';
 import { useEffect, useState } from 'react';
 import { LyricsProject } from '@/types/lyrics';
 import { Loader2 } from 'lucide-react';

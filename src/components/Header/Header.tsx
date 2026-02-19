@@ -79,21 +79,21 @@ export const Header = ({
   };
 
   return (
-    <header className="h-14 flex items-center justify-between px-4 border-b border-panel-border bg-panel">
+    <header className="h-14 flex items-center justify-between px-2 md:px-4 border-b border-panel-border bg-panel gap-2">
       {/* Logo */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
         {leftElement}
         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-primary-foreground">
           <Music2 className="h-5 w-5" />
         </div>
-        <div>
+        <div className="hidden sm:block">
           <h1 className="font-semibold text-lg tracking-tight">Yosync Studio</h1>
         </div>
       </div>
 
       {/* Undo/Redo & Mode Switcher */}
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-1 bg-muted/30 p-1 rounded-md">
+      <div className="flex items-center gap-2 md:gap-6">
+        <div className="hidden sm:flex items-center gap-1 bg-muted/30 p-1 rounded-md">
           <Button
             variant="ghost"
             size="icon"
@@ -119,16 +119,16 @@ export const Header = ({
         <Tabs
           value={project.syncMode}
           onValueChange={(v) => onToggleSyncMode(v as SyncMode)}
-          className="w-[180px]"
+          className="w-[140px] md:w-[180px]"
         >
           <TabsList className="grid w-full grid-cols-2 h-9">
-            <TabsTrigger value="line" className="text-[10px] uppercase font-bold tracking-wider gap-1.5">
+            <TabsTrigger value="line" className="text-[10px] uppercase font-bold tracking-wider gap-1 md:gap-1.5">
               <ListMusic className="h-3.5 w-3.5" />
-              Line
+              <span className="hidden xs:inline">Line</span>
             </TabsTrigger>
-            <TabsTrigger value="word" className="text-[10px] uppercase font-bold tracking-wider gap-1.5">
+            <TabsTrigger value="word" className="text-[10px] uppercase font-bold tracking-wider gap-1 md:gap-1.5">
               <Zap className="h-3.5 w-3.5" />
-              Word
+              <span className="hidden xs:inline">Word</span>
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -225,8 +225,8 @@ export const Header = ({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="default" size="sm" className="shadow-md">
-              <Download className="h-4 w-4 mr-2" />
-              Export
+              <Download className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Export</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">

@@ -160,7 +160,7 @@ const AboutPage = () => {
                     </div>
 
                     <div className="space-y-12 relative before:absolute before:inset-0 before:ml-[23px] before:w-1 before:bg-muted/50">
-                        {changelogData.releases.map((release, rIdx) => (
+                        {changelogData.releases.slice(0, 3).map((release, rIdx) => (
                             <div key={rIdx} className="relative pl-16">
                                 {/* Dot */}
                                 <div className="absolute left-0 top-0 w-12 h-12 rounded-full bg-background border-4 border-primary shadow-xl flex items-center justify-center z-10 transition-transform hover:scale-110">
@@ -182,9 +182,11 @@ const AboutPage = () => {
                                         {release.changes.map((change, cIdx) => (
                                             <div key={cIdx} className="flex gap-4 p-4 rounded-2xl bg-muted/20 border border-border/50">
                                                 <div className="mt-1">
-                                                    {change.type === 'feature' && <Rocket className="h-5 w-5 text-green-500" />}
-                                                    {change.type === 'improvement' && <Sparkles className="h-5 w-5 text-blue-500" />}
+                                                    {change.type === 'feature' && <Rocket className="h-5 w-5 text-emerald-500" />}
+                                                    {change.type === 'improvement' && <Sparkles className="h-5 w-5 text-sky-500" />}
                                                     {change.type === 'security' && <ShieldCheck className="h-5 w-5 text-orange-500" />}
+                                                    {change.type === 'performance' && <Zap className="h-5 w-5 text-amber-500" />}
+                                                    {change.type === 'fix' && <CheckCircle2 className="h-5 w-5 text-rose-500" />}
                                                 </div>
                                                 <div className="space-y-1">
                                                     <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{change.type}</span>

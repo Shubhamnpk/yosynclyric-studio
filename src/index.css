@@ -122,6 +122,35 @@
     @apply bg-muted-foreground/30;
   }
 
+  /* Mobile touch optimization */
+  @media (max-width: 768px) {
+
+    button,
+    a,
+    [role="button"] {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    /* Use dynamic viewport height on mobile */
+    .h-screen {
+      height: 100dvh;
+    }
+
+    /* Smaller scrollbars on mobile */
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+
+    /* Safe area insets for notched devices */
+    body {
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  }
+
   /* Thin scrollbar for waveform */
   .scrollbar-thin::-webkit-scrollbar {
     height: 6px;
