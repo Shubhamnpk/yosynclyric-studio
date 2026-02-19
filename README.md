@@ -1,8 +1,10 @@
+<p align="center">
+  <img src="public/favicon.svg" alt="Yosync Studio Logo" width="120" height="120" />
+</p>
+
 # Yosync Studio
 
 A modern, web-based application for creating and editing synchronized lyrics (karaoke-style) with precision timing and professional features.
-
-![Yosync Studio Screenshot](https://github.com/Shubhamnpk/synclyric-studio/blob/main/public/placeholder.svg?raw=true)
 
 ## 🚀 Features
 
@@ -20,6 +22,7 @@ A modern, web-based application for creating and editing synchronized lyrics (ka
 
 ### User Experience
 - **Modern UI/UX** - Clean, intuitive interface built with shadcn/ui and Tailwind CSS
+- **Fully Responsive Design** - Optimized for mobile, tablet, and desktop screens
 - **Dark/Light Theme** - System preference detection with manual override
 - **Real-time Collaboration** - Auto-save and backup functionality
 - **Keyboard Shortcuts** - Efficient workflow with undo/redo support
@@ -33,6 +36,7 @@ A modern, web-based application for creating and editing synchronized lyrics (ka
 - **Audio Processing**: Web Audio API with waveform visualization
 - **Video Rendering**: HTML5 Canvas with FFmpeg.js
 - **Storage**: Encrypted local storage with backup system
+- **Responsiveness**: Mobile-first architecture using Tailwind CSS breakpoints
 
 ## 📦 Installation
 
@@ -87,13 +91,18 @@ A modern, web-based application for creating and editing synchronized lyrics (ka
 - **TXT**: Plain text format
 - **MP4 Video**: High-quality video with synchronized lyrics
 
-## 📱 Browser Support
+## 📱 Browser & Device Support
 
-Yosync Studio works in all modern browsers:
-- Chrome 90+
-- Firefox 88+
-- Safari 14+
-- Edge 90+
+### Desktop
+- **Chrome** (Recommended)
+- **Firefox**
+- **Edge**
+- **Safari**
+
+### Mobile & Tablet
+- **iOS** (Safari on iPhone/iPad)
+- **Android** (Chrome on all Android devices)
+- **Tablets** (iPadOS, Android Tablets)
 
 ## 🔧 Development
 
