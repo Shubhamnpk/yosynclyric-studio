@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
+import { SEO } from '@/components/SEO';
 import { getProjectById, createNewProject } from '@/utils/projectStorage';
 import { SyncLyricsApp } from '@/components/App';
 import { useEffect, useState } from 'react';
@@ -42,7 +43,15 @@ const EditorPage = () => {
 
     if (!project) return null;
 
-    return <SyncLyricsApp initialProject={project} />;
+    return (
+        <>
+            <SEO
+                title={`Editing: ${project.title}`}
+                description={`Synchronize lyrics for ${project.title} by ${project.artist}.`}
+            />
+            <SyncLyricsApp initialProject={project} />
+        </>
+    );
 };
 
 export default EditorPage;

@@ -43,6 +43,9 @@ export interface AudioState {
   duration: number;
   isLoaded: boolean;
   playbackRate: number;
+  volume: number;
+  isYoutube?: boolean;
+  youtubeId?: string | null;
 }
 
 

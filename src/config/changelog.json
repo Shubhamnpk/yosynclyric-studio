@@ -1,7 +1,34 @@
 {
-    "version": "0.1.1",
-    "build": "2026.02.19.01",
+    "version": "0.1.2",
+    "build": "2026.02.23.01",
     "releases": [
+        {
+            "date": "2026-02-23",
+            "version": "0.1.2",
+            "title": "YouTube & URL Audio Bridge",
+            "changes": [
+                {
+                    "type": "feature",
+                    "text": "Integrated YouTube Audio Bridge: Sync lyrics directly using any YouTube URL without downloading files."
+                },
+                {
+                    "type": "feature",
+                    "text": "Floating Video Preview: Toggleable YouTube video window for frame-accurate visual synchronization."
+                },
+                {
+                    "type": "feature",
+                    "text": "Universal URL Support: Added the ability to load and play audio from direct web links (MP3, WAV, M4A)."
+                },
+                {
+                    "type": "improvement",
+                    "text": "Flat Reference Waveform: Reliable straight-line waveform for streaming audio sources where peaks are unavailable."
+                },
+                {
+                    "type": "improvement",
+                    "text": "Unified 'Change Source' Workflow: Seamlessly switch between local files and URLs within the same project."
+                }
+            ]
+        },
         {
             "date": "2026-02-19",
             "version": "0.1.1",

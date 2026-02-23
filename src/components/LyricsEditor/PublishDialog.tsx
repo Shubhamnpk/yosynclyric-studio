@@ -11,12 +11,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, Music, Clock, Loader2, UploadCloud } from 'lucide-react';
+import { Search, Music, Clock, Loader2, UploadCloud, Database, Globe, CheckCircle2, X } from 'lucide-react';
 import { LrcLibApi, LRCLibSearchResult } from '@/services/lrcLib';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { LyricsProject } from '@/types/lyrics';
+import { useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
+import { Switch } from '@/components/ui/switch';
 
 interface PublishDialogProps {
     open: boolean;
@@ -30,6 +33,11 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
     const [artistName, setArtistName] = useState(project.artist);
     const [albumName, setAlbumName] = useState('');
     const [duration, setDuration] = useState(audioDuration ? Math.round(audioDuration) : 0);
+
+    const [publishToLrcLib, setPublishToLrcLib] = useState(true);
+    const [publishToYosync, setPublishToYosync] = useState(true);
+
+    const publishMutation = useMutation(api.lyrics.publish);
 
     // Update state when props change
     useEffect(() => {
@@ -47,6 +55,9 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
 
     const isFormValid = trackName && artistName && duration && hasContent;
 
+    // Yosync only allows synced lyrics
+    const canPublishToYosync = hasTimestamps && isFormValid;
+
     const [publishing, setPublishing] = useState(false);
     const [status, setStatus] = useState('');
 
@@ -56,21 +67,19 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
             return;
         }
 
+        if (publishToYosync && !hasTimestamps) {
+            toast.error('Only synchronized lyrics can be published to Yosync Database');
+            return;
+        }
+
+        if (!publishToLrcLib && !publishToYosync) {
+            toast.error('Please select at least one destination to publish');
+            return;
+        }
+
         setPublishing(true);
-        setStatus('Requesting challenge...');
 
         try {
-            // 1. Request Challenge
-            const challenge = await LrcLibApi.requestChallenge();
-            if (!challenge) {
-                throw new Error('Could not get challenge from server');
-            }
-
-            // 2. Solve Challenge
-            setStatus('Solving proof-of-work challenge...');
-            const token = await LrcLibApi.solveChallenge(challenge.prefix, challenge.target);
-
-            // 3. Prepare Lyrics
             const plainLyrics = project.lines.map(l => l.text).join('\n');
             const syncedLyrics = project.lines.map(l => {
                 const totalSeconds = (l.startTime || 0) / 1000;
@@ -81,24 +90,45 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                 return `${timeTag} ${l.text}`;
             }).join('\n');
 
+            // 1. Publish to Yosync (Convex)
+            if (publishToYosync) {
+                setStatus('Publishing to Yosync Database...');
+                await publishMutation({
+                    trackName,
+                    artistName,
+                    albumName,
+                    duration,
+                    plainLyrics,
+                    syncedLyrics
+                });
+                toast.success('Submitted to Yosync! Awaiting admin approval.');
+            }
 
-            // 4. Publish
-            setStatus('Publishing lyrics...');
-            await LrcLibApi.publish({
-                trackName,
-                artistName,
-                albumName,
-                duration,
-                plainLyrics,
-                syncedLyrics
-            }, token);
+            // 2. Publish to LRCLIB
+            if (publishToLrcLib) {
+                setStatus('Requesting LRCLIB challenge...');
+                const challenge = await LrcLibApi.requestChallenge();
+                if (challenge) {
+                    setStatus('Solving LRCLIB challenge...');
+                    const token = await LrcLibApi.solveChallenge(challenge.prefix, challenge.target);
+                    setStatus('Publishing to LRCLIB...');
+                    await LrcLibApi.publish({
+                        trackName,
+                        artistName,
+                        albumName,
+                        duration,
+                        plainLyrics,
+                        syncedLyrics
+                    }, token);
+                    toast.success('Lyrics published to LRCLIB!');
+                }
+            }
 
-            toast.success('Lyrics published successfully!');
             onOpenChange(false);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            toast.error('Failed to publish lyrics');
+            toast.error(error.message || 'Failed to publish lyrics');
         } finally {
             setPublishing(false);
             setStatus('');
@@ -107,38 +137,91 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[500px] w-[95vw] p-0 overflow-hidden border-none shadow-2xl">
-                <DialogHeader className="p-5 md:p-6 bg-gradient-to-br from-primary/10 to-transparent border-b border-primary/10">
-                    <DialogTitle className="flex items-center gap-2 text-xl">
-                        <UploadCloud className="h-5 w-5 text-primary" />
-                        Publish to LRCLIB
-                    </DialogTitle>
-                    <DialogDescription className="text-xs md:text-sm">
-                        Contribute your synchronized lyrics to the open LRCLIB database.
+            <DialogContent className="sm:max-w-[550px] w-[95vw] p-0 overflow-hidden border-none shadow-2xl bg-background/95 backdrop-blur-xl">
+                <DialogHeader className="p-6 md:p-8 bg-gradient-to-br from-primary/20 via-primary/5 to-transparent border-b border-primary/10">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+                            <UploadCloud className="h-6 w-6" />
+                        </div>
+                        <DialogTitle className="text-2xl font-bold tracking-tight">
+                            Publish Lyrics
+                        </DialogTitle>
+                    </div>
+                    <DialogDescription className="text-sm text-balance">
+                        Share your synchronized lyrics with the world. Your contribution helps music lovers everywhere.
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="p-5 md:p-6 space-y-5">
+                <div className="p-6 md:p-8 space-y-6">
                     {/* Status Alerts */}
                     {!hasContent ? (
-                        <div className="flex items-center gap-3 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-destructive">
-                            <UploadCloud className="h-4 w-4 shrink-0" />
-                            <span>The project has no lyrics to publish. Please import lyrics first.</span>
+                        <div className="flex items-center gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-xs text-destructive animate-in fade-in zoom-in-95">
+                            <X className="h-4 w-4 shrink-0" />
+                            <span className="font-medium">The project has no lyrics to publish. Please import or write lyrics first.</span>
                         </div>
                     ) : !hasTimestamps ? (
-                        <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-400">
-                            <UploadCloud className="h-4 w-4 shrink-0" />
-                            <span>Lyrics have no timestamps. They will be published as plain text only.</span>
+                        <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-400 animate-in fade-in zoom-in-95">
+                            <Clock className="h-4 w-4 shrink-0" />
+                            <span className="font-medium">Lyrics have no timestamps. They can only be published to LRCLIB as plain text.</span>
                         </div>
                     ) : (
-                        <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400">
-                            <UploadCloud className="h-4 w-4 shrink-0" />
-                            <span>Ready to publish synced lyrics for {project.lines.length} lines.</span>
+                        <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400 animate-in fade-in zoom-in-95">
+                            <CheckCircle2 className="h-4 w-4 shrink-0" />
+                            <span className="font-medium">Perfect! Ready to publish synced lyrics for {project.lines.length} lines.</span>
                         </div>
                     )}
 
+                    {/* Destination Selectors */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div
+                            className={cn(
+                                "relative p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col gap-2",
+                                publishToYosync ? "border-primary bg-primary/5" : "border-muted bg-muted/20 opacity-60",
+                                !canPublishToYosync && "cursor-not-allowed grayscale"
+                            )}
+                            onClick={() => canPublishToYosync && setPublishToYosync(!publishToYosync)}
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="p-2 rounded-lg bg-background shadow-sm">
+                                    <Database className={cn("h-4 w-4", publishToYosync ? "text-primary" : "text-muted-foreground")} />
+                                </div>
+                                <Switch
+                                    checked={publishToYosync}
+                                    disabled={!canPublishToYosync}
+                                    onCheckedChange={setPublishToYosync}
+                                />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-sm">Yosync Database</h3>
+                                <p className="text-[10px] text-muted-foreground leading-tight">Official high-quality synced lyrics (Requires Approval)</p>
+                            </div>
+                        </div>
+
+                        <div
+                            className={cn(
+                                "relative p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col gap-2",
+                                publishToLrcLib ? "border-primary bg-primary/5" : "border-muted bg-muted/20 opacity-60"
+                            )}
+                            onClick={() => setPublishToLrcLib(!publishToLrcLib)}
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="p-2 rounded-lg bg-background shadow-sm">
+                                    <Globe className={cn("h-4 w-4", publishToLrcLib ? "text-primary" : "text-muted-foreground")} />
+                                </div>
+                                <Switch
+                                    checked={publishToLrcLib}
+                                    onCheckedChange={setPublishToLrcLib}
+                                />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-sm">LRCLIB</h3>
+                                <p className="text-[10px] text-muted-foreground leading-tight">Open source global database (Instant Public)</p>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Form Grid */}
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-2">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <Label className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground ml-0.5">Track Name</Label>
@@ -146,7 +229,7 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                                     value={trackName}
                                     onChange={e => setTrackName(e.target.value)}
                                     placeholder="Title"
-                                    className="bg-muted/30 border-muted-foreground/20 focus:border-primary/50"
+                                    className="bg-muted/30 border-muted-foreground/20 focus:border-primary/50 h-10 rounded-xl"
                                 />
                             </div>
                             <div className="space-y-1.5">
@@ -155,7 +238,7 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                                     value={artistName}
                                     onChange={e => setArtistName(e.target.value)}
                                     placeholder="Artist"
-                                    className="bg-muted/30 border-muted-foreground/20 focus:border-primary/50"
+                                    className="bg-muted/30 border-muted-foreground/20 focus:border-primary/50 h-10 rounded-xl"
                                 />
                             </div>
                         </div>
@@ -167,7 +250,7 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                                     value={albumName}
                                     onChange={e => setAlbumName(e.target.value)}
                                     placeholder="Album"
-                                    className="bg-muted/30 border-muted-foreground/20 focus:border-primary/50"
+                                    className="bg-muted/30 border-muted-foreground/20 focus:border-primary/50 h-10 rounded-xl"
                                 />
                             </div>
                             <div className="space-y-1.5">
@@ -178,10 +261,10 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                                         value={duration || ''}
                                         onChange={e => setDuration(parseInt(e.target.value) || 0)}
                                         placeholder="e.g. 180"
-                                        className="bg-muted/30 border-muted-foreground/20 focus:border-primary/50 pr-12"
+                                        className="bg-muted/30 border-muted-foreground/20 focus:border-primary/50 pr-12 h-10 rounded-xl"
                                     />
                                     {audioDuration > 0 && (
-                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-primary font-bold">
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-primary font-bold bg-primary/10 px-1.5 py-0.5 rounded">
                                             AUTO
                                         </div>
                                     )}
@@ -191,31 +274,35 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                     </div>
 
                     {publishing && (
-                        <div className="flex items-center gap-3 p-4 bg-primary/5 border border-primary/10 rounded-xl animate-in fade-in slide-in-from-bottom-2">
-                            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                        <div className="flex items-center gap-4 p-5 bg-primary/5 border border-primary/20 rounded-2xl animate-in fade-in slide-in-from-bottom-4 shadow-inner">
+                            <div className="relative">
+                                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                <div className="absolute inset-0 bg-primary/20 blur-lg rounded-full animate-pulse" />
+                            </div>
                             <div className="flex flex-col">
-                                <span className="text-sm font-semibold text-primary">{status}</span>
-                                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Please do not close this dialog</span>
+                                <span className="text-sm font-bold text-primary tracking-tight">{status}</span>
+                                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Please do not close this window</span>
                             </div>
                         </div>
                     )}
                 </div>
 
-                <DialogFooter className="p-4 bg-muted/30 border-t border-muted-foreground/10 flex flex-col xs:flex-row gap-2">
-                    <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={publishing} className="w-full xs:w-auto">
+                <DialogFooter className="p-6 md:p-8 bg-muted/20 border-t border-muted-foreground/10 flex flex-col sm:flex-row gap-3">
+                    <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={publishing} className="w-full sm:w-auto rounded-xl">
                         Cancel
                     </Button>
                     <Button
                         onClick={handlePublish}
-                        disabled={publishing || !isFormValid}
-                        className="w-full xs:flex-1 font-bold shadow-lg shadow-primary/20"
+                        disabled={publishing || !isFormValid || (!publishToLrcLib && !publishToYosync)}
+                        className="w-full sm:flex-1 font-bold shadow-xl shadow-primary/20 h-11 rounded-xl group overflow-hidden relative"
                     >
+                        <div className="absolute inset-0 bg-gradient-to-r from-primary-foreground/0 via-primary-foreground/10 to-primary-foreground/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                         {publishing ? (
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         ) : (
-                            <UploadCloud className="h-4 w-4 mr-2" />
+                            <UploadCloud className="h-4 w-4 mr-2 transition-transform group-hover:-translate-y-1" />
                         )}
-                        Publish to LRCLIB
+                        Confirm Publication
                     </Button>
                 </DialogFooter>
             </DialogContent>
