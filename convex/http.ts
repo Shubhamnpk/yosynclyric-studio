@@ -16,7 +16,10 @@ http.route({
         if (!trackName || !artistName) {
             return new Response(JSON.stringify({ error: "Missing track_name or artist_name" }), {
                 status: 400,
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                },
             });
         }
 
@@ -29,7 +32,10 @@ http.route({
         if (!lyrics) {
             return new Response(JSON.stringify({ error: "Lyrics not found" }), {
                 status: 404,
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                },
             });
         }
 
@@ -53,7 +59,10 @@ http.route({
         if (!query) {
             return new Response(JSON.stringify({ error: "Missing query parameter 'q'" }), {
                 status: 400,
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                },
             });
         }
 

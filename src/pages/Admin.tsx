@@ -405,30 +405,46 @@ const PlaybackPreview = ({ lyrics, trackInfo }: { lyrics: string, trackInfo?: { 
 
 const AdminPage = () => {
     const navigate = useNavigate();
-    const [isAuthorized, setIsAuthorized] = useState(() => {
-        return sessionStorage.getItem("admin_auth") === "true";
-    });
+    
+    // Server-side auth state
+    const [isAuthorized, setIsAuthorized] = useState(false);
     const [password, setPassword] = useState("");
+    const [isVerifying, setIsVerifying] = useState(false);
+    const [adminSecret, setAdminSecret] = useState("");
 
-    const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || "admin123";
+    // Server-side auth verification mutation
+    const verifyAdminMutation = useMutation(api.lyrics.verifyAdmin);
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (password === ADMIN_PASSWORD) {
-            setIsAuthorized(true);
-            sessionStorage.setItem("admin_auth", "true");
-            toast.success("Welcome, Admin");
-        } else {
-            toast.error("Invalid password");
+        if (!password.trim()) {
+            toast.error("Please enter a password");
+            return;
+        }
+        
+        try {
+            setIsVerifying(true);
+            const isValid = await verifyAdminMutation({ password });
+            if (isValid) {
+                setIsAuthorized(true);
+                setAdminSecret(password); // Store the password as adminSecret for subsequent calls
+                toast.success("Welcome, Admin");
+            } else {
+                toast.error("Invalid password");
+            }
+        } catch (error) {
+            toast.error("Authentication failed");
+        } finally {
+            setIsVerifying(false);
         }
     };
 
     const [adminView, setAdminView] = useState<"pending" | "approved" | "rejected" | "all">("pending");
     const [searchQuery, setSearchQuery] = useState("");
 
-    // Data Hooks
-    const allLyrics = useQuery(api.lyrics.listAll);
-    const stats = useQuery(api.lyrics.getStats);
+    // Data Hooks - Only initialize after server-side auth succeeds
+    const allLyrics = isAuthorized ? useQuery(api.lyrics.listAll, { adminSecret }) : undefined;
+    const stats = isAuthorized ? useQuery(api.lyrics.getStats, { adminSecret }) : undefined;
     const updateStatus = useMutation(api.lyrics.updateStatus);
     const updateLyrics = useMutation(api.lyrics.updateLyrics);
     const deleteLyric = useMutation(api.lyrics.deleteLyric);
@@ -454,7 +470,7 @@ const AdminPage = () => {
 
     const handleStatus = async (id: Id<"lyrics">, status: "approved" | "rejected") => {
         try {
-            await updateStatus({ id, status });
+            await updateStatus({ id, status, adminSecret });
             toast.success(`Lyrics ${status} successfully`);
             if (selectedLyric?._id === id) setSelectedLyric(null);
         } catch (error) {
@@ -465,7 +481,7 @@ const AdminPage = () => {
     const handleDelete = async (id: Id<"lyrics">) => {
         if (!confirm("Are you sure you want to delete this lyrics entry? This cannot be undone.")) return;
         try {
-            await deleteLyric({ id });
+            await deleteLyric({ id, adminSecret });
             toast.success("Lyrics deleted permanently");
             setSelectedLyric(null);
         } catch (error) {
@@ -481,7 +497,8 @@ const AdminPage = () => {
                 artistName: editData.artistName,
                 albumName: editData.albumName,
                 plainLyrics: editData.plainLyrics,
-                syncedLyrics: editData.syncedLyrics
+                syncedLyrics: editData.syncedLyrics,
+                adminSecret,
             });
             toast.success("Lyrics updated successfully");
             setIsEditMode(false);
@@ -561,8 +578,9 @@ const AdminPage = () => {
                         <Button
                             variant="outline"
                             onClick={() => {
-                                sessionStorage.removeItem("admin_auth");
                                 setIsAuthorized(false);
+                                setPassword("");
+                                setAdminSecret("");
                             }}
                             className="rounded-full border-muted-foreground/20"
                         >

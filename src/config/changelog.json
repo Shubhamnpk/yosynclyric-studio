@@ -1,7 +1,26 @@
 {
-    "version": "0.1.2",
-    "build": "2026.02.23.01",
+    "version": "0.1.2-2",
+    "build": "2026.03.10.01",
     "releases": [
+        {
+            "date": "2026-03-10",
+            "version": "0.1.2-2",
+            "title": "Security & Authorization Update",
+            "changes": [
+                {
+                    "type": "security",
+                    "text": "Implemented server-side (Convex) authorization for admin endpoints - password verification now happens on the server rather than client-side."
+                },
+                {
+                    "type": "fix",
+                    "text": "Removed client-side secret checks and sessionStorage reliance for admin access control."
+                },
+                {
+                    "type": "improvement",
+                    "text": "Admin data hooks (listAll, getStats) now conditionally initialize only after successful server-side authentication."
+                }
+            ]
+        },
         {
             "date": "2026-02-23",
             "version": "0.1.2",

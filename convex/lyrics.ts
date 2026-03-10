@@ -1,6 +1,21 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
+// Server-side admin password (set in convex environment variables)
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
+
+// Helper function to validate admin secret
+const validateAdmin = (adminSecret: string): boolean => {
+    return adminSecret === ADMIN_PASSWORD;
+};
+
+export const verifyAdmin = mutation({
+    args: { password: v.string() },
+    handler: async (ctx, args) => {
+        return args.password === ADMIN_PASSWORD;
+    },
+});
+
 export const publish = mutation({
     args: {
         trackName: v.string(),
@@ -46,7 +61,11 @@ export const publish = mutation({
 
 // Admin Queries
 export const listPending = query({
-    handler: async (ctx) => {
+    args: { adminSecret: v.string() },
+    handler: async (ctx, args) => {
+        if (!validateAdmin(args.adminSecret)) {
+            throw new Error("Unauthorized: Invalid admin secret");
+        }
         return await ctx.db
             .query("lyrics")
             .withIndex("by_status", (q) => q.eq("status", "pending"))
@@ -55,7 +74,11 @@ export const listPending = query({
 });
 
 export const listAll = query({
-    handler: async (ctx) => {
+    args: { adminSecret: v.string() },
+    handler: async (ctx, args) => {
+        if (!validateAdmin(args.adminSecret)) {
+            throw new Error("Unauthorized: Invalid admin secret");
+        }
         return await ctx.db.query("lyrics").order("desc").collect();
     },
 });
@@ -65,8 +88,12 @@ export const updateStatus = mutation({
     args: {
         id: v.id("lyrics"),
         status: v.string(), // "approved" or "rejected"
+        adminSecret: v.string(),
     },
     handler: async (ctx, args) => {
+        if (!validateAdmin(args.adminSecret)) {
+            throw new Error("Unauthorized: Invalid admin secret");
+        }
         const isApproved = args.status === "approved";
         await ctx.db.patch(args.id, {
             status: args.status,
@@ -138,22 +165,33 @@ export const updateLyrics = mutation({
         albumName: v.optional(v.string()),
         plainLyrics: v.string(),
         syncedLyrics: v.string(),
+        adminSecret: v.string(),
     },
     handler: async (ctx, args) => {
-        const { id, ...data } = args;
+        if (!validateAdmin(args.adminSecret)) {
+            throw new Error("Unauthorized: Invalid admin secret");
+        }
+        const { id, adminSecret, ...data } = args;
         await ctx.db.patch(id, data);
     },
 });
 
 export const deleteLyric = mutation({
-    args: { id: v.id("lyrics") },
+    args: { id: v.id("lyrics"), adminSecret: v.string() },
     handler: async (ctx, args) => {
+        if (!validateAdmin(args.adminSecret)) {
+            throw new Error("Unauthorized: Invalid admin secret");
+        }
         await ctx.db.delete(args.id);
     },
 });
 
 export const getStats = query({
-    handler: async (ctx) => {
+    args: { adminSecret: v.string() },
+    handler: async (ctx, args) => {
+        if (!validateAdmin(args.adminSecret)) {
+            throw new Error("Unauthorized: Invalid admin secret");
+        }
         const all = await ctx.db.query("lyrics").collect();
         return {
             total: all.length,
