@@ -74,6 +74,9 @@ export const SyncLyricsApp = ({ initialProject }: SyncLyricsAppProps) => {
     rewind,
     forward,
     setPlaybackRate,
+    setVolume,
+    setAudioState,
+    setYoutubePlayer,
     waveformPeaks,
     isLoadingWaveform,
   } = useAudioPlayer();
@@ -84,6 +87,18 @@ export const SyncLyricsApp = ({ initialProject }: SyncLyricsAppProps) => {
     const currentSettings = getSettings();
     saveSettings({ ...currentSettings, theme: newDark ? 'dark' : 'light' });
   }, [isDark]);
+
+  // Load audio on mount if URL exists
+  useEffect(() => {
+    if (project.audioUrl && !audioState.isLoaded) {
+      loadAudio(project.audioUrl);
+    }
+  }, []); // Only on mount
+
+  const handleLoadAudio = useCallback((url: string) => {
+    loadAudio(url);
+    updateProject({ audioUrl: url });
+  }, [loadAudio, updateProject]);
 
   // Update active line based on playback
 
@@ -261,13 +276,14 @@ export const SyncLyricsApp = ({ initialProject }: SyncLyricsAppProps) => {
           audioUrl={project.audioUrl}
           waveformPeaks={waveformPeaks}
           isLoadingWaveform={isLoadingWaveform}
-          onLoadAudio={loadAudio}
+          onLoadAudio={handleLoadAudio}
           onSetAudioFile={setAudioFile}
           onPlayPause={togglePlayPause}
           onSeek={seek}
           onRewind={rewind}
           onForward={forward}
           onSetPlaybackRate={setPlaybackRate}
+          onSetVolume={setVolume}
           onCaptureStartTime={handleCaptureStartTime}
           onCaptureEndTime={handleCaptureEndTime}
           selectedLineText={selectedLine?.text || ''}
@@ -276,6 +292,8 @@ export const SyncLyricsApp = ({ initialProject }: SyncLyricsAppProps) => {
             if (selectedLineId) setWordTiming(selectedLineId, wordIndex, start, end);
           }}
           selectedLine={selectedLine}
+          setYoutubePlayer={setYoutubePlayer}
+          setAudioState={setAudioState}
         />
       </div>
 

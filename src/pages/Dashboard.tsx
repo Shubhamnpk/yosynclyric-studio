@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { SEO } from '@/components/SEO';
 import { getAllProjects, createNewProject, deleteProject } from '@/utils/projectStorage';
 import { downloadLyrics } from '@/utils/exportLyrics';
 import { LyricsProject } from '@/types/lyrics';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Music2, Clock, Trash2, Search, MoreVertical, FileAudio, Settings2, Download, Edit3, FileText, ExternalLink, Info } from 'lucide-react';
+import { PlusCircle, Music2, Clock, Trash2, Search, MoreVertical, FileAudio, Settings2, Download, Edit3, FileText, ExternalLink, Info, Shield } from 'lucide-react';
 
 import { formatDistanceToNow } from 'date-fns';
 import { Input } from '@/components/ui/input';
@@ -49,6 +50,10 @@ const Dashboard = () => {
 
     return (
         <div className="min-h-screen bg-background text-foreground p-6 md:p-12">
+            <SEO
+                title="Dashboard"
+                description="Manage your synchronized lyrics projects in Yosync Studio."
+            />
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
@@ -61,8 +66,11 @@ const Dashboard = () => {
                         </div>
                         <p className="text-muted-foreground text-lg">Create and manage your synchronized lyrics projects.</p>
                     </div>
-
                     <div className="flex items-center gap-2 md:gap-3">
+                        <Button variant="outline" size="lg" onClick={() => navigate('/admin')} className="rounded-full px-3 md:px-6">
+                            <Shield className="md:mr-2 h-5 w-5" />
+                            <span className="hidden md:inline">Admin</span>
+                        </Button>
                         <Button variant="outline" size="lg" onClick={() => navigate('/about')} className="rounded-full px-3 md:px-6">
                             <Info className="md:mr-2 h-5 w-5" />
                             <span className="hidden md:inline">About</span>
@@ -180,7 +188,7 @@ const Dashboard = () => {
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 };
 

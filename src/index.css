@@ -346,4 +346,21 @@
   .animation-delay-4000 {
     animation-delay: 4s;
   }
+
+  @keyframes visualizer-bar {
+
+    0%,
+    100% {
+      transform: scaleY(0.2);
+    }
+
+    50% {
+      transform: scaleY(1);
+    }
+  }
+
+  .animate-visualizer-bar {
+    animation: visualizer-bar 0.5s ease-in-out infinite;
+    transform-origin: bottom;
+  }
 }

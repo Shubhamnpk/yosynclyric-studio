@@ -36,6 +36,8 @@ A modern, web-based application for creating and editing synchronized lyrics (ka
 - **Audio Processing**: Web Audio API with waveform visualization
 - **Video Rendering**: HTML5 Canvas with FFmpeg.js
 - **Storage**: Encrypted local storage with backup system
+- **Database**: [Convex](https://www.convex.dev/) for community-sourced, verified lyrics
+- **Public API**: Real-time HTTP endpoints for lyrics discovery
 - **Responsiveness**: Mobile-first architecture using Tailwind CSS breakpoints
 
 ## 📦 Installation
@@ -90,6 +92,31 @@ A modern, web-based application for creating and editing synchronized lyrics (ka
 - **VTT**: Web video subtitle format
 - **TXT**: Plain text format
 - **MP4 Video**: High-quality video with synchronized lyrics
+
+### Community Features
+- **Publish to Yosync**: Share your verified synced lyrics with the community
+- **Universal Search**: Search lyrics across Yosync Database and LRCLIB
+- **Admin Review**: Community submissions are reviewed for quality and accuracy
+
+## 🌐 Public API
+
+Yosync Studio provides a public HTTP API to access verified community lyrics.
+
+### Get Lyrics
+Fetch lyrics by song details.
+- **Endpoint**: `https://<your-convex-site-url>/get`
+- **Method**: `GET`
+- **Params**:
+  - `track_name` (required)
+  - `artist_name` (required)
+  - `duration` (optional)
+
+### Search Lyrics
+Search the community database for songs.
+- **Endpoint**: `https://<your-convex-site-url>/search`
+- **Method**: `GET`
+- **Params**:
+  - `q` (required) - Search query for track title
 
 ## 📱 Browser & Device Support
 
