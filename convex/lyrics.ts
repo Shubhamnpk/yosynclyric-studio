@@ -1,18 +1,39 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
-// Server-side admin password (set in convex environment variables)
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
+// ============ NOTIFICATIONS ============
 
-// Helper function to validate admin secret
-const validateAdmin = (adminSecret: string): boolean => {
-    return adminSecret === ADMIN_PASSWORD;
-};
-
-export const verifyAdmin = mutation({
-    args: { password: v.string() },
+export const getUserNotifications = query({
+    args: { userId: v.optional(v.id("users")) },
     handler: async (ctx, args) => {
-        return args.password === ADMIN_PASSWORD;
+        if (!args.userId) return [];
+        return await ctx.db
+            .query("notifications")
+            .withIndex("by_user_id", (q) => q.eq("userId", args.userId!))
+            .order("desc")
+            .collect();
+    },
+});
+
+export const markRead = mutation({
+    args: { id: v.id("notifications") },
+    handler: async (ctx, args) => {
+        await ctx.db.patch(args.id, { isRead: true });
+    },
+});
+
+export const markAllRead = mutation({
+    args: { userId: v.id("users") },
+    handler: async (ctx, args) => {
+        const unread = await ctx.db
+            .query("notifications")
+            .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
+            .filter((q) => q.eq(q.field("isRead"), false))
+            .collect();
+
+        for (const notification of unread) {
+            await ctx.db.patch(notification._id, { isRead: true });
+        }
     },
 });
 
@@ -23,15 +44,15 @@ export const publish = mutation({
         albumName: v.optional(v.string()),
         duration: v.number(),
         plainLyrics: v.string(),
-        syncedLyrics: v.string(), // Required
+        syncedLyrics: v.string(),
+        submittedBy: v.string(),
+        submittedById: v.optional(v.id("users")),
     },
     handler: async (ctx, args) => {
-        // Only allow synced lyrics (double check logic)
         if (!args.syncedLyrics || args.syncedLyrics.trim().length === 0) {
             throw new Error("Only synced lyrics are allowed to be published");
         }
 
-        // Check if it already exists
         const existing = await ctx.db
             .query("lyrics")
             .withIndex("by_track_artist", (q) =>
@@ -42,8 +63,9 @@ export const publish = mutation({
         if (existing) {
             await ctx.db.patch(existing._id, {
                 ...args,
-                status: "pending", // Re-verify on update
+                status: "pending",
                 isApproved: false,
+                updatedAt: Date.now(),
             });
             return existing._id;
         }
@@ -59,50 +81,7 @@ export const publish = mutation({
     },
 });
 
-// Admin Queries
-export const listPending = query({
-    args: { adminSecret: v.string() },
-    handler: async (ctx, args) => {
-        if (!validateAdmin(args.adminSecret)) {
-            throw new Error("Unauthorized: Invalid admin secret");
-        }
-        return await ctx.db
-            .query("lyrics")
-            .withIndex("by_status", (q) => q.eq("status", "pending"))
-            .collect();
-    },
-});
-
-export const listAll = query({
-    args: { adminSecret: v.string() },
-    handler: async (ctx, args) => {
-        if (!validateAdmin(args.adminSecret)) {
-            throw new Error("Unauthorized: Invalid admin secret");
-        }
-        return await ctx.db.query("lyrics").order("desc").collect();
-    },
-});
-
-// Admin Mutations
-export const updateStatus = mutation({
-    args: {
-        id: v.id("lyrics"),
-        status: v.string(), // "approved" or "rejected"
-        adminSecret: v.string(),
-    },
-    handler: async (ctx, args) => {
-        if (!validateAdmin(args.adminSecret)) {
-            throw new Error("Unauthorized: Invalid admin secret");
-        }
-        const isApproved = args.status === "approved";
-        await ctx.db.patch(args.id, {
-            status: args.status,
-            isApproved: isApproved,
-        });
-    },
-});
-
-// Search (Public) - Only Approved
+// Search - Public (only approved)
 export const search = query({
     args: {
         trackName: v.string(),
@@ -128,11 +107,9 @@ export const search = query({
     },
 });
 
-// Search (Public) - Text Search
+// Search by text - Public
 export const searchByText = query({
-    args: {
-        query: v.string(),
-    },
+    args: { query: v.string() },
     handler: async (ctx, args) => {
         return await ctx.db
             .query("lyrics")
@@ -143,7 +120,7 @@ export const searchByText = query({
     },
 });
 
-// Analytics
+// Increment search count
 export const incrementSearchCount = mutation({
     args: { id: v.id("lyrics") },
     handler: async (ctx, args) => {
@@ -156,41 +133,83 @@ export const incrementSearchCount = mutation({
     },
 });
 
-// Admin Mutations & Advanced Management
-export const updateLyrics = mutation({
-    args: {
-        id: v.id("lyrics"),
-        trackName: v.string(),
-        artistName: v.string(),
-        albumName: v.optional(v.string()),
-        plainLyrics: v.string(),
-        syncedLyrics: v.string(),
-        adminSecret: v.string(),
-    },
+export const getById = query({
+    args: { id: v.id("lyrics") },
     handler: async (ctx, args) => {
-        if (!validateAdmin(args.adminSecret)) {
-            throw new Error("Unauthorized: Invalid admin secret");
-        }
-        const { id, adminSecret, ...data } = args;
-        await ctx.db.patch(id, data);
+        return await ctx.db.get(args.id);
     },
 });
 
-export const deleteLyric = mutation({
-    args: { id: v.id("lyrics"), adminSecret: v.string() },
+// ============ ADMIN FUNCTIONS (require token) ============
+
+const validateToken = async (ctx: any, token?: string): Promise<{ valid: boolean; userId?: string; error?: string }> => {
+    if (!token) return { valid: false, error: "No token provided" };
+
+    const session = await ctx.db
+        .query("sessions")
+        .withIndex("by_token", (q: any) => q.eq("token", token))
+        .unique();
+
+    if (!session) return { valid: false, error: "Invalid session" };
+
+    if (Date.now() > session.expiresAt) {
+        await ctx.db.delete(session._id);
+        return { valid: false, error: "Session expired" };
+    }
+
+    const user = await ctx.db.get(session.userId);
+    if (!user || user.role !== "admin") {
+        return { valid: false, error: "Admin access required" };
+    }
+
+    return { valid: true, userId: user._id };
+};
+
+// Admin: List all lyrics
+export const listAll = query({
+    args: { token: v.optional(v.string()) },
     handler: async (ctx, args) => {
-        if (!validateAdmin(args.adminSecret)) {
-            throw new Error("Unauthorized: Invalid admin secret");
+        const validation = await validateToken(ctx, args.token);
+        if (!validation.valid) {
+            throw new Error(validation.error || "Unauthorized");
         }
-        await ctx.db.delete(args.id);
+        const lyrics = await ctx.db.query("lyrics").order("desc").collect();
+        return lyrics.map(l => ({
+            ...l,
+            submittedBy: l.submittedBy || "Legacy Contributor"
+        }));
     },
 });
 
+// Admin: Migrate old data
+export const migrateLegacyLyrics = mutation({
+    args: { token: v.string() },
+    handler: async (ctx, args) => {
+        const validation = await validateToken(ctx, args.token);
+        if (!validation.valid) throw new Error("Unauthorized");
+
+        const all = await ctx.db.query("lyrics").collect();
+        let updated = 0;
+        for (const lyric of all) {
+            if (!lyric.submittedBy) {
+                await ctx.db.patch(lyric._id, {
+                    submittedBy: "Legacy Contributor",
+                    updatedAt: Date.now()
+                });
+                updated++;
+            }
+        }
+        return { updated };
+    }
+});
+
+// Admin: Get stats
 export const getStats = query({
-    args: { adminSecret: v.string() },
+    args: { token: v.optional(v.string()) },
     handler: async (ctx, args) => {
-        if (!validateAdmin(args.adminSecret)) {
-            throw new Error("Unauthorized: Invalid admin secret");
+        const validation = await validateToken(ctx, args.token);
+        if (!validation.valid) {
+            throw new Error(validation.error || "Unauthorized");
         }
         const all = await ctx.db.query("lyrics").collect();
         return {
@@ -200,12 +219,85 @@ export const getStats = query({
             rejected: all.filter(l => l.status === "rejected").length,
             totalSearches: all.reduce((acc, current) => acc + (current.searchHistory || 0), 0)
         };
-    }
+    },
 });
 
-export const getById = query({
-    args: { id: v.id("lyrics") },
+// Admin: Update status
+export const updateStatus = mutation({
+    args: {
+        id: v.id("lyrics"),
+        status: v.string(),
+        rejectionReason: v.optional(v.string()),
+        token: v.optional(v.string()),
+    },
     handler: async (ctx, args) => {
-        return await ctx.db.get(args.id);
+        const validation = await validateToken(ctx, args.token);
+        if (!validation.valid) {
+            throw new Error(validation.error || "Unauthorized");
+        }
+
+        const lyric = await ctx.db.get(args.id);
+        if (!lyric) throw new Error("Lyric not found");
+
+        const isApproved = args.status === "approved";
+        await ctx.db.patch(args.id, {
+            status: args.status,
+            isApproved,
+            rejectionReason: args.rejectionReason,
+        });
+
+        // Create notification for submmiter if they have an account or name
+        if (lyric.submittedById || lyric.submittedBy) {
+            const type = isApproved ? "approval" : "rejection";
+            const title = isApproved ? "Lyrics Approved!" : "Submission Update Needed";
+            const message = isApproved
+                ? `Your synced lyrics for "${lyric.trackName}" have been approved and are now live!`
+                : `Your submission for "${lyric.trackName}" was not approved. Reason: ${args.rejectionReason || "Please review and resubmit."}`;
+
+            if (lyric.submittedById) {
+                await ctx.db.insert("notifications", {
+                    userId: lyric.submittedById,
+                    type,
+                    title,
+                    message,
+                    lyricId: args.id,
+                    isRead: false,
+                    createdAt: Date.now(),
+                });
+            }
+        }
+    },
+});
+
+// Admin: Update lyrics
+export const updateLyrics = mutation({
+    args: {
+        id: v.id("lyrics"),
+        trackName: v.string(),
+        artistName: v.string(),
+        albumName: v.optional(v.string()),
+        plainLyrics: v.string(),
+        syncedLyrics: v.string(),
+        token: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+        const validation = await validateToken(ctx, args.token);
+        if (!validation.valid) {
+            throw new Error(validation.error || "Unauthorized");
+        }
+        const { id, token, ...data } = args;
+        await ctx.db.patch(id, data);
+    },
+});
+
+// Admin: Delete lyric
+export const deleteLyric = mutation({
+    args: { id: v.id("lyrics"), token: v.optional(v.string()) },
+    handler: async (ctx, args) => {
+        const validation = await validateToken(ctx, args.token);
+        if (!validation.valid) {
+            throw new Error(validation.error || "Unauthorized");
+        }
+        await ctx.db.delete(args.id);
     },
 });

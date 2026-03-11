@@ -20,6 +20,8 @@ import { LyricsProject } from '@/types/lyrics';
 import { useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { Switch } from '@/components/ui/switch';
+import { useAuth } from '@/hooks/useAuth';
+import { User } from 'lucide-react';
 
 interface PublishDialogProps {
     open: boolean;
@@ -38,6 +40,8 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
     const [publishToYosync, setPublishToYosync] = useState(true);
 
     const publishMutation = useMutation(api.lyrics.publish);
+    const ensureGuestMutation = useMutation(api.auth.ensureGuestUser);
+    const { submissionUsername, user } = useAuth();
 
     // Update state when props change
     useEffect(() => {
@@ -93,13 +97,23 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
             // 1. Publish to Yosync (Convex)
             if (publishToYosync) {
                 setStatus('Publishing to Yosync Database...');
+                
+                let actualSubmittedById = user?._id;
+                
+                // If not logged in, ensure a guest user record exists in DB
+                if (!actualSubmittedById) {
+                    actualSubmittedById = await ensureGuestMutation({ name: submissionUsername });
+                }
+
                 await publishMutation({
                     trackName,
                     artistName,
                     albumName,
                     duration,
                     plainLyrics,
-                    syncedLyrics
+                    syncedLyrics,
+                    submittedBy: submissionUsername,
+                    submittedById: actualSubmittedById as any
                 });
                 toast.success('Submitted to Yosync! Awaiting admin approval.');
             }
@@ -150,6 +164,11 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                     <DialogDescription className="text-sm text-balance">
                         Share your synchronized lyrics with the world. Your contribution helps music lovers everywhere.
                     </DialogDescription>
+                    <div className="flex items-center gap-2 mt-4 text-[11px] font-medium text-primary/70 bg-primary/10 px-3 py-1.5 rounded-full w-fit max-w-full truncate border border-primary/20">
+                        <User className="h-3 w-3 shrink-0" />
+                        <span>Contributing as: </span>
+                        <span className="font-bold text-primary truncate">{submissionUsername}</span>
+                    </div>
                 </DialogHeader>
 
                 <div className="p-6 md:p-8 space-y-6">

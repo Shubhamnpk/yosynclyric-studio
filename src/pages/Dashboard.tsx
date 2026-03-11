@@ -6,7 +6,8 @@ import { downloadLyrics } from '@/utils/exportLyrics';
 import { LyricsProject } from '@/types/lyrics';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Music2, Clock, Trash2, Search, MoreVertical, FileAudio, Settings2, Download, Edit3, FileText, ExternalLink, Info, Shield } from 'lucide-react';
+import { PlusCircle, Music2, Clock, Trash2, Search, MoreVertical, FileAudio, Settings2, Download, Edit3, FileText, ExternalLink, Info, Shield, LogOut, User } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 import { formatDistanceToNow } from 'date-fns';
 import { Input } from '@/components/ui/input';
@@ -18,11 +19,13 @@ import {
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { NotificationBell } from '@/components/Header/NotificationBell';
 
 const Dashboard = () => {
     const [projects, setProjects] = useState<LyricsProject[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const navigate = useNavigate();
+    const { logout, user } = useAuth();
 
     useEffect(() => {
         setProjects(getAllProjects());
@@ -39,6 +42,12 @@ const Dashboard = () => {
         deleteProject(id);
         setProjects(getAllProjects());
         toast.success('Project deleted');
+    };
+
+    const handleLogout = async () => {
+        await logout();
+        toast.success('Logged out successfully');
+        navigate('/');
     };
 
     const filteredProjects = projects
@@ -79,6 +88,45 @@ const Dashboard = () => {
                             <Settings2 className="md:mr-2 h-5 w-5" />
                             <span className="hidden md:inline">Settings</span>
                         </Button>
+                        <NotificationBell />
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="lg" className="rounded-full px-3 h-11 w-11 p-0 flex items-center justify-center overflow-hidden border border-muted-foreground/10 hover:bg-muted">
+                                    <div className="bg-primary/10 w-full h-full flex items-center justify-center text-primary">
+                                        <User className="h-5 w-5" />
+                                    </div>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56 mt-2">
+                                <div className="flex flex-col px-3 py-2">
+                                    <p className="text-sm font-medium">{user?.name || 'User'}</p>
+                                    <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                                    <div className="mt-1">
+                                        <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full uppercase font-bold">
+                                            {user?.role}
+                                        </span>
+                                    </div>
+                                </div>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => navigate('/profile')}>
+                                    <User className="h-4 w-4 mr-2" />
+                                    My Profile
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => navigate('/settings')}>
+                                    <Settings2 className="h-4 w-4 mr-2" />
+                                    Settings
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => navigate('/about')}>
+                                    <Info className="h-4 w-4 mr-2" />
+                                    About
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                    <LogOut className="h-4 w-4 mr-2" />
+                                    Logout
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                         <Button size="lg" onClick={handleCreateProject} className="rounded-full shadow-lg shadow-primary/20 px-4 md:px-8">
                             <PlusCircle className="md:mr-2 h-5 w-5" />
                             <span className="hidden sm:inline">New Project</span>
