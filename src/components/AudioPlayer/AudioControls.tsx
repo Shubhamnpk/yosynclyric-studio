@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import YouTube from 'react-youtube';
+import { YTMusicSearchDialog } from '../LyricsEditor/YTMusicSearchDialog';
+import { toast } from 'sonner';
 
 interface AudioControlsProps {
   audioState: AudioState;
@@ -44,6 +46,8 @@ interface AudioControlsProps {
   selectedLine?: LyricLine;
   setYoutubePlayer?: (player: any) => void;
   setAudioState?: (state: any) => void;
+  onUpdateProject?: (updates: Partial<{ title: string; artist: string; album?: string }>) => void;
+  defaultSearchQuery?: string;
 }
 
 export const AudioControls = ({
@@ -67,12 +71,15 @@ export const AudioControls = ({
   selectedLine,
   setYoutubePlayer,
   setAudioState,
+  onUpdateProject,
+  defaultSearchQuery,
 }: AudioControlsProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [syncingWordIndex, setSyncingWordIndex] = useState<number | null>(null);
   const [urlInput, setUrlInput] = useState("");
   const [showVideo, setShowVideo] = useState(false);
+  const [isYTSearchOpen, setIsYTSearchOpen] = useState(false);
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -189,21 +196,32 @@ export const AudioControls = ({
                   <div className="h-[1px] w-8 bg-current md:w-[1px] md:h-8" />
                 </div>
 
-                <div className="flex-1 w-full bg-muted/30 rounded-xl p-6 flex flex-col gap-3">
-                  <p className="text-sm font-bold flex items-center gap-2">
-                    <Link2 className="h-4 w-4 text-primary" />
-                    Enter Audio URL
-                  </p>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Paste YouTube or MP3 link..."
-                      className="bg-background/50 h-9 text-xs"
-                      value={urlInput}
-                      onChange={(e) => setUrlInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()} />
-                    <Button size="sm" onClick={handleUrlSubmit}>Load</Button>
+                  <div className="flex-1 w-full bg-muted/30 rounded-xl p-6 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-bold flex items-center gap-2">
+                        <Link2 className="h-4 w-4 text-primary" />
+                        Audio Source
+                      </p>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 text-[10px] font-bold text-red-500 hover:text-red-600 hover:bg-red-500/10 gap-1.5"
+                        onClick={() => setIsYTSearchOpen(true)}
+                      >
+                        <Youtube className="h-3 w-3" />
+                        SEARCH YT MUSIC
+                      </Button>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Paste YouTube Link or Video ID..."
+                        className="bg-background/50 h-9 text-xs"
+                        value={urlInput}
+                        onChange={(e) => setUrlInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()} />
+                      <Button size="sm" onClick={handleUrlSubmit}>Load</Button>
+                    </div>
                   </div>
-                </div>
               </div>
             </div>
           )}
@@ -412,6 +430,24 @@ export const AudioControls = ({
           />
         </div>
       )}
+      <YTMusicSearchDialog
+        open={isYTSearchOpen}
+        onOpenChange={setIsYTSearchOpen}
+        initialQuery={defaultSearchQuery || selectedLineText || ""}
+        onSelect={(videoId, metadata) => {
+          const url = `https://www.youtube.com/watch?v=${videoId}`;
+          onLoadAudio(url);
+          
+          if (onUpdateProject) {
+            onUpdateProject({
+              title: metadata.title,
+              artist: metadata.artist,
+              album: metadata.album
+            });
+          }
+          toast.success(`Linked: ${metadata.title}`);
+        }}
+      />
     </div>
   );
 };

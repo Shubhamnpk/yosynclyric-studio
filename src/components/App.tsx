@@ -179,7 +179,7 @@ export const SyncLyricsApp = ({ initialProject }: SyncLyricsAppProps) => {
         onToggleMetadata={() => setIsMetadataOpen(true)}
         onExportVideo={() => setIsVideoExportOpen(true)}
         leftElement={
-          <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="mr-2">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')} className="mr-2">
             <ArrowLeft className="w-4 h-4 md:mr-2" />
             <span className="hidden md:inline">Dashboard</span>
           </Button>
@@ -294,6 +294,8 @@ export const SyncLyricsApp = ({ initialProject }: SyncLyricsAppProps) => {
           selectedLine={selectedLine}
           setYoutubePlayer={setYoutubePlayer}
           setAudioState={setAudioState}
+          onUpdateProject={updateProject}
+          defaultSearchQuery={`${project.title} ${project.artist}`.trim()}
         />
       </div>
 
