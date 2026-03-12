@@ -159,9 +159,6 @@ export const useLyricsEditor = (initialProject: LyricsProject) => {
       const newLine: LyricLine = {
         ...sourceLine,
         id: generateId(),
-        // Keep text but maybe clear timestamps? User said "duplicate the lyrics", 
-        // usually implies keeping text. Keeping timestamps might be confusing 
-        // but often requested. Let's keep text and clear timestamps for the copy.
         startTime: null,
         endTime: null,
         words: sourceLine.words?.map(w => ({ ...w, startTime: 0, endTime: 0 })),
@@ -211,11 +208,14 @@ export const useLyricsEditor = (initialProject: LyricsProject) => {
     const updates: Partial<LyricsProject> = { audioFile: file, audioUrl: url };
 
     // Auto extract metadata if currently "Untitled" or empty
-    if (project.title === 'Untitled' || !project.title.trim()) {
-      try {
-        const metadata = await mmb.parseBlob(file);
-        const { title, artist, album, year, genre, picture } = metadata.common;
+    try {
+      const metadata = await mmb.parseBlob(file);
+      const { title, artist, album, year, genre, picture } = metadata.common;
+      const { duration } = metadata.format;
 
+      if (duration) updates.duration = Math.round(duration);
+
+      if (project.title === 'Untitled' || !project.title.trim()) {
         if (title) updates.title = title;
         if (artist) updates.artist = artist;
         if (album) updates.album = album;
@@ -241,24 +241,8 @@ export const useLyricsEditor = (initialProject: LyricsProject) => {
             updates.title = fileName.trim();
           }
         }
-      } catch (error) {
-        console.error('Error parsing audio metadata:', error);
-        // Fallback to filename on error
-        const fileName = file.name.replace(/\.[^/.]+$/, "");
-        const separatorIndex = fileName.indexOf(' - ');
-        if (separatorIndex !== -1) {
-          updates.title = fileName.substring(0, separatorIndex).trim();
-          updates.artist = fileName.substring(separatorIndex + 3).trim();
-        } else {
-          updates.title = fileName.trim();
-        }
-      }
-    } else {
-      // Even if title is set, try to extract cover art and other missing fields
-      try {
-        const metadata = await mmb.parseBlob(file);
-        const { album, year, genre, picture } = metadata.common;
-
+      } else {
+        // Even if title is set, try to extract cover art and other missing fields
         if (!project.album && album) updates.album = album;
         if (!project.year && year) updates.year = String(year);
         if (!project.genre && genre && genre.length > 0) updates.genre = genre[0];
@@ -268,8 +252,19 @@ export const useLyricsEditor = (initialProject: LyricsProject) => {
           const blob = new Blob([new Uint8Array(pic.data)], { type: pic.format });
           updates.coverArtUrl = URL.createObjectURL(blob);
         }
-      } catch (error) {
-        console.error('Error extracting additional metadata:', error);
+      }
+    } catch (error) {
+      console.error('Error parsing audio metadata:', error);
+      // Fallback to filename on error if title missing
+      if (project.title === 'Untitled' || !project.title.trim()) {
+        const fileName = file.name.replace(/\.[^/.]+$/, "");
+        const separatorIndex = fileName.indexOf(' - ');
+        if (separatorIndex !== -1) {
+          updates.title = fileName.substring(0, separatorIndex).trim();
+          updates.artist = fileName.substring(separatorIndex + 3).trim();
+        } else {
+          updates.title = fileName.trim();
+        }
       }
     }
 
@@ -355,7 +350,7 @@ export const useLyricsEditor = (initialProject: LyricsProject) => {
     setSelectedLineId(lines[0]?.id || null);
   }, [updateState]);
 
-  const importLRC = useCallback((text: string) => {
+  const importLRC = useCallback((text: string, filename?: string) => {
     const { lines, metadata } = parseLRC(text);
     if (lines.length === 0) return;
 
@@ -364,8 +359,28 @@ export const useLyricsEditor = (initialProject: LyricsProject) => {
         lines,
         updatedAt: new Date(),
       };
-      if (metadata.title && (!prev.title || prev.title === 'Untitled')) updates.title = metadata.title;
-      if (metadata.artist && !prev.artist) updates.artist = metadata.artist;
+
+      let finalTitle = metadata.title;
+      let finalArtist = metadata.artist;
+      let finalAlbum = metadata.album;
+      let finalDuration = metadata.duration;
+
+      // If no tags in LRC, try to parse from filename
+      if (!finalTitle && filename) {
+        const cleanName = filename.replace(/\.(lrc|txt)$/i, "");
+        const separatorIndex = cleanName.indexOf(' - ');
+        if (separatorIndex !== -1) {
+          finalArtist = finalArtist || cleanName.substring(0, separatorIndex).trim();
+          finalTitle = cleanName.substring(separatorIndex + 3).trim();
+        } else {
+          finalTitle = cleanName.trim();
+        }
+      }
+
+      if (finalTitle && (!prev.title || prev.title === 'Untitled')) updates.title = finalTitle;
+      if (finalArtist && !prev.artist) updates.artist = finalArtist;
+      if (finalAlbum && !prev.album) updates.album = finalAlbum;
+      if (finalDuration && !prev.duration) updates.duration = finalDuration;
 
       return { ...prev, ...updates };
     });

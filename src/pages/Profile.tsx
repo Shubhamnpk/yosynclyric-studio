@@ -34,11 +34,12 @@ const ProfilePage = () => {
         (!user && submissionUsername) ? { name: submissionUsername } : "skip"
     );
 
-    const activeUser = user || (guestUserInDb ? { _id: guestUserInDb as any, name: submissionUsername, role: "guest" as const, email: "" } : null);
+    const activeUser = user || (guestUserInDb ? { _id: guestUserInDb as any, name: submissionUsername.startsWith('@') ? submissionUsername.substring(1) : submissionUsername, username: submissionUsername.startsWith('@') ? submissionUsername.substring(1) : submissionUsername, role: "guest" as const, email: "" } : null);
 
     const [editingProfile, setEditingProfile] = useState(false);
     const [newName, setNewName] = useState(activeUser?.name || "");
     const [newEmail, setNewEmail] = useState(user?.email || "");
+    const [newUsername, setNewUsername] = useState(user?.username || "");
     const [isSaving, setIsSaving] = useState(false);
 
     const [isUpgrading, setIsUpgrading] = useState(false);
@@ -57,6 +58,7 @@ const ProfilePage = () => {
         if (activeUser) {
             setNewName(activeUser.name || "");
             setNewEmail(activeUser.email || "");
+            setNewUsername(activeUser.username || "");
         }
     }, [activeUser]);
 
@@ -67,7 +69,8 @@ const ProfilePage = () => {
             const result = await updateProfileMutation({
                 userId: activeUser._id as any,
                 name: newName,
-                email: user ? newEmail : undefined
+                email: user ? newEmail : undefined,
+                username: user ? newUsername : undefined
             });
             if (result.success) {
                 toast.success("Profile updated");
@@ -196,8 +199,8 @@ const ProfilePage = () => {
                             <CardContent className="pt-0 relative px-6 pb-8">
                                 <div className="flex flex-col items-start -mt-10 mb-6">
                                     <div className="relative group/avatar">
-                                        <div className="w-20 h-20 rounded-3xl bg-card border-4 border-card shadow-2xl flex items-center justify-center text-primary group-hover:scale-105 transition-transform duration-300">
-                                            <User className="h-10 w-10" />
+                                        <div className="w-20 h-20 rounded-3xl bg-card border-4 border-card shadow-2xl flex items-center justify-center text-primary group-hover:scale-105 transition-transform duration-300 overflow-hidden font-black text-3xl uppercase">
+                                            {activeUser.name ? activeUser.name.charAt(0) : (activeUser.username ? activeUser.username.charAt(0) : <User className="h-10 w-10 text-primary/40" />)}
                                         </div>
                                         <div className="absolute -bottom-1 -right-1 p-2 rounded-xl bg-primary text-primary-foreground shadow-lg opacity-0 group-hover/avatar:opacity-100 transition-opacity cursor-pointer">
                                             <Camera className="h-3.5 w-3.5" />
@@ -293,6 +296,25 @@ const ProfilePage = () => {
                                             <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 group hover:bg-muted/30 transition-colors truncate">
                                                 <Mail className="h-4 w-4 text-primary/60" />
                                                 <span className="font-bold text-sm tracking-tight truncate">{activeUser.email || (isGuest ? "Not linked (Upgrade Required)" : "Loading...")}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Username (@handle)</Label>
+                                        {editingProfile && !isGuest ? (
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-black">@</span>
+                                                <Input 
+                                                   value={newUsername} 
+                                                   onChange={e => setNewUsername(e.target.value)} 
+                                                   className="bg-muted/30 border-none rounded-xl h-11 focus-visible:ring-primary/30 pl-8" 
+                                                   placeholder="username"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 group hover:bg-muted/30 transition-colors">
+                                                <span className="text-primary/60 font-black">@</span>
+                                                <span className="font-bold text-sm tracking-tight">{activeUser.username || "Not set"}</span>
                                             </div>
                                         )}
                                     </div>

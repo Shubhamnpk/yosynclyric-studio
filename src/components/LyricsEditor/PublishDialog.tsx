@@ -11,13 +11,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, Music, Clock, Loader2, UploadCloud, Database, Globe, CheckCircle2, X } from 'lucide-react';
+import { Search, Music, Clock, Loader2, UploadCloud, Database, Globe, CheckCircle2, X, Sparkles, Diff, LayoutGrid, FileText } from 'lucide-react';
 import { LrcLibApi, LRCLibSearchResult } from '@/services/lrcLib';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { LyricsProject } from '@/types/lyrics';
-import { useMutation } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/hooks/useAuth';
@@ -33,8 +35,8 @@ interface PublishDialogProps {
 export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: PublishDialogProps) => {
     const [trackName, setTrackName] = useState(project.title);
     const [artistName, setArtistName] = useState(project.artist);
-    const [albumName, setAlbumName] = useState('');
-    const [duration, setDuration] = useState(audioDuration ? Math.round(audioDuration) : 0);
+    const [albumName, setAlbumName] = useState(project.album || '');
+    const [duration, setDuration] = useState(audioDuration ? Math.round(audioDuration) : (project.duration || 0));
 
     const [publishToLrcLib, setPublishToLrcLib] = useState(true);
     const [publishToYosync, setPublishToYosync] = useState(true);
@@ -43,16 +45,26 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
     const ensureGuestMutation = useMutation(api.auth.ensureGuestUser);
     const { submissionUsername, user } = useAuth();
 
+    const [isDuplicate, setIsDuplicate] = useState(false);
+    const [originalId, setOriginalId] = useState<string | null>(null);
+    const [parentLyricId, setParentLyricId] = useState<string | null>(null);
+    const [showComparison, setShowComparison] = useState(false);
+
+    const parentLyric = useQuery(api.lyrics.getById, parentLyricId ? { id: parentLyricId as any } : "skip");
+
     // Update state when props change
     useEffect(() => {
         if (open) {
             setTrackName(project.title);
             setArtistName(project.artist);
+            setAlbumName(project.album || '');
             if (audioDuration) {
                 setDuration(Math.round(audioDuration));
+            } else if (project.duration) {
+                setDuration(project.duration);
             }
         }
-    }, [open, project.title, project.artist, audioDuration]);
+    }, [open, project.title, project.artist, project.album, project.duration, audioDuration]);
 
     const hasContent = project.lines.length > 0 && project.lines.some(l => l.text.trim().length > 0);
     const hasTimestamps = project.lines.some(l => l.startTime !== null);
@@ -97,25 +109,42 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
             // 1. Publish to Yosync (Convex)
             if (publishToYosync) {
                 setStatus('Publishing to Yosync Database...');
-                
+
                 let actualSubmittedById = user?._id;
-                
+
                 // If not logged in, ensure a guest user record exists in DB
                 if (!actualSubmittedById) {
                     actualSubmittedById = await ensureGuestMutation({ name: submissionUsername });
                 }
 
-                await publishMutation({
+                const publishArgs: any = {
                     trackName,
                     artistName,
-                    albumName,
+                    albumName: albumName || undefined,
                     duration,
                     plainLyrics,
                     syncedLyrics,
                     submittedBy: submissionUsername,
                     submittedById: actualSubmittedById as any
-                });
-                toast.success('Submitted to Yosync! Awaiting admin approval.');
+                };
+                if (parentLyricId) {
+                    publishArgs.parentLyricId = parentLyricId as any;
+                }
+
+                const publishResult: any = await publishMutation(publishArgs);
+
+                if (publishResult.duplicate) {
+                    setIsDuplicate(true);
+                    setOriginalId(publishResult.originalId);
+                    toast.warning("Duplicate detected");
+                    setPublishing(false);
+                    setStatus('');
+                    return;
+                }
+
+                if (publishResult.success) {
+                    toast.success(parentLyricId ? 'Improvement suggested! Awaiting review.' : 'Submitted to Yosync! Awaiting admin approval.');
+                }
             }
 
             // 2. Publish to LRCLIB
@@ -158,7 +187,7 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                             <UploadCloud className="h-6 w-6" />
                         </div>
                         <DialogTitle className="text-2xl font-bold tracking-tight">
-                            Publish Lyrics
+                            {parentLyricId ? "Submit Improvement" : "Publish Lyrics"}
                         </DialogTitle>
                     </div>
                     <DialogDescription className="text-sm text-balance">
@@ -173,7 +202,87 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
 
                 <div className="p-6 md:p-8 space-y-6">
                     {/* Status Alerts */}
-                    {!hasContent ? (
+                    {isDuplicate ? (
+                        <div className="flex flex-col gap-3 p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 animate-in fade-in slide-in-from-top-2">
+                            <div className="flex items-start gap-3">
+                                <Search className="h-5 w-5 mt-0.5 shrink-0" />
+                                <div className="space-y-1">
+                                    <p className="font-bold text-sm">Song Already in Database</p>
+                                    <p className="text-[11px] leading-relaxed opacity-90">
+                                        We already have an approved version of "{trackName}". You cannot create a duplicate, but you can suggest an improvement if your version is better.
+                                    </p>
+                                </div>
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full mt-2 bg-amber-500/10 border-amber-500/20 hover:bg-amber-500/20 text-[10px] font-black uppercase tracking-widest h-9"
+                                onClick={() => {
+                                    setParentLyricId(originalId);
+                                    setIsDuplicate(false);
+                                    toast.info("Switched to Improvement Mode. You can now suggest your changes.");
+                                }}
+                            >
+                                Submit as Improvement Instead
+                            </Button>
+                        </div>
+                    ) : parentLyricId ? (
+                        <div className="space-y-4 animate-in fade-in zoom-in-95">
+                            <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/10 border border-primary/20 text-xs text-primary">
+                                <Sparkles className="h-4 w-4 shrink-0" />
+                                <div className="flex-1">
+                                    <span className="font-medium">You are suggesting an improvement to the existing track. Admins will review and merge your changes.</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-7 text-[10px] uppercase font-bold hover:bg-primary/10"
+                                        onClick={() => setShowComparison(!showComparison)}
+                                    >
+                                        <Diff className="h-3 w-3 mr-1.5" />
+                                        {showComparison ? "Hide Comparison" : "Compare Changes"}
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setParentLyricId(null)}>
+                                        <X className="h-3 w-3" />
+                                    </Button>
+                                </div>
+                            </div>
+                            
+                            {showComparison && parentLyric && (
+                                <div className="grid grid-cols-2 gap-px bg-muted rounded-xl overflow-hidden border border-muted animate-in slide-in-from-top-2">
+                                    <div className="flex flex-col bg-background h-[200px]">
+                                        <div className="p-2 border-b bg-muted/30 flex items-center gap-2">
+                                            <FileText className="h-3 w-3 text-muted-foreground" />
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Existing Version</span>
+                                        </div>
+                                        <ScrollArea className="flex-1 p-3 bg-muted/5">
+                                            <pre className="text-[9px] leading-relaxed whitespace-pre-wrap font-mono text-muted-foreground/80 selection:bg-primary/20">
+                                                {parentLyric.syncedLyrics}
+                                            </pre>
+                                        </ScrollArea>
+                                    </div>
+                                    <div className="flex flex-col bg-background h-[200px]">
+                                        <div className="p-2 border-b bg-primary/5 flex items-center gap-2">
+                                            <Sparkles className="h-3 w-3 text-primary" />
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-primary">Your Improved Version</span>
+                                        </div>
+                                        <ScrollArea className="flex-1 p-3 bg-primary/[0.02]">
+                                            <pre className="text-[9px] leading-relaxed whitespace-pre-wrap font-mono text-primary/80 selection:bg-primary/20">
+                                                {project.lines.map(l => {
+                                                    const totalSeconds = (l.startTime || 0) / 1000;
+                                                    const mm = Math.floor(totalSeconds / 60);
+                                                    const ss = Math.floor(totalSeconds % 60);
+                                                    const xx = Math.floor((totalSeconds % 1) * 100);
+                                                    return `[${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}.${xx.toString().padStart(2, '0')}] ${l.text}`;
+                                                }).join('\n')}
+                                            </pre>
+                                        </ScrollArea>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ) : !hasContent ? (
                         <div className="flex items-center gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-xs text-destructive animate-in fade-in zoom-in-95">
                             <X className="h-4 w-4 shrink-0" />
                             <span className="font-medium">The project has no lyrics to publish. Please import or write lyrics first.</span>

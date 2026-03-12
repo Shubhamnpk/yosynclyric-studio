@@ -29,6 +29,7 @@ import {
     FileAudio,
     Sparkles,
     Info,
+    Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -59,6 +60,7 @@ export const MetadataEditorDialog = ({
     const [album, setAlbum] = useState(project.album || '');
     const [year, setYear] = useState(project.year || '');
     const [genre, setGenre] = useState(project.genre || '');
+    const [duration, setDuration] = useState(project.duration ? String(project.duration) : '');
     const [coverPreview, setCoverPreview] = useState<string | null>(project.coverArtUrl);
     const [coverFile, setCoverFile] = useState<File | null>(null);
     const [embedLyrics, setEmbedLyrics] = useState(true);
@@ -74,6 +76,7 @@ export const MetadataEditorDialog = ({
             setAlbum(project.album || '');
             setYear(project.year || '');
             setGenre(project.genre || '');
+            setDuration(project.duration ? String(project.duration) : '');
             setCoverPreview(project.coverArtUrl);
             setCoverFile(null);
             setIsSaved(false);
@@ -109,6 +112,7 @@ export const MetadataEditorDialog = ({
             album,
             year,
             genre,
+            duration: duration ? parseInt(duration) : undefined,
         };
 
         // Update cover art URL if a new file was uploaded
@@ -151,6 +155,7 @@ export const MetadataEditorDialog = ({
                 album,
                 year,
                 genre,
+                duration: duration ? parseInt(duration) : project.duration,
             };
 
             await downloadWithMetadata(updatedProject, {
@@ -357,6 +362,20 @@ export const MetadataEditorDialog = ({
                                         onChange={(e) => setGenre(e.target.value)}
                                         placeholder="Pop"
                                         className="bg-background/50 border-muted-foreground/20 focus:border-primary/50"
+                                    />
+                                </div>
+                                <div>
+                                    <Label htmlFor="meta-duration" className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
+                                        <Clock className="h-3 w-3" />
+                                        Duration (sec)
+                                    </Label>
+                                    <Input
+                                        id="meta-duration"
+                                        value={duration}
+                                        onChange={(e) => setDuration(e.target.value)}
+                                        placeholder="210"
+                                        className="bg-background/50 border-muted-foreground/20 focus:border-primary/50"
+                                        type="number"
                                     />
                                 </div>
                             </div>

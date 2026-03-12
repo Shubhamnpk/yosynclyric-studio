@@ -39,7 +39,8 @@ import {
     History,
     CheckCircle2,
     Save,
-    Loader2
+    Loader2,
+    Sparkles
 } from "lucide-react";
 import {
     Dialog,
@@ -399,8 +400,14 @@ const AdminPage = () => {
     const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
 
-    const [adminView, setAdminView] = useState<"pending" | "approved" | "rejected" | "all">("pending");
+    const [adminView, setAdminView] = useState<"pending" | "improvement_pending" | "approved" | "rejected" | "all">("pending");
     const [searchQuery, setSearchQuery] = useState("");
+
+    const [selectedLyric, setSelectedLyric] = useState<any>(null);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [editData, setEditData] = useState<any>(null);
+    const [rejectionReason, setRejectionReason] = useState("");
+    const [isRejecting, setIsRejecting] = useState(false);
 
     // Data hooks - use skip to avoid calling when not authenticated
     const allLyrics = useQuery(
@@ -415,6 +422,11 @@ const AdminPage = () => {
     const updateLyrics = useMutation(api.lyrics.updateLyrics);
     const deleteLyric = useMutation(api.lyrics.deleteLyric);
     const migrateLegacy = useMutation(api.lyrics.migrateLegacyLyrics);
+
+    const parentLyric = useQuery(
+        api.lyrics.getById,
+        selectedLyric?.parentLyricId ? { id: selectedLyric.parentLyricId } : "skip"
+    );
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -456,11 +468,6 @@ const AdminPage = () => {
         return matchesStatus && matchesQuery;
     });
 
-    const [selectedLyric, setSelectedLyric] = useState<any>(null);
-    const [isEditMode, setIsEditMode] = useState(false);
-    const [editData, setEditData] = useState<any>(null);
-    const [rejectionReason, setRejectionReason] = useState("");
-    const [isRejecting, setIsRejecting] = useState(false);
 
     const handleSelect = (lyric: any) => {
         setSelectedLyric(lyric);
@@ -607,7 +614,7 @@ const AdminPage = () => {
                 </div>
 
                 {/* Stats Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                     <Card className="bg-muted/30 border-none shadow-sm">
                         <CardHeader className="p-4 pb-0">
                             <CardDescription className="text-xs uppercase tracking-wider font-bold">Total</CardDescription>
@@ -626,6 +633,12 @@ const AdminPage = () => {
                             <CardTitle className="text-2xl text-amber-700">{stats?.pending || 0}</CardTitle>
                         </CardHeader>
                     </Card>
+                    <Card className="bg-primary/5 border-primary/10">
+                        <CardHeader className="p-4 pb-0">
+                            <CardDescription className="text-xs uppercase tracking-wider font-bold text-primary">Improvements</CardDescription>
+                            <CardTitle className="text-2xl text-primary font-black">{(stats as any)?.improvements || 0}</CardTitle>
+                        </CardHeader>
+                    </Card>
                     <Card className="bg-blue-500/5 border-blue-500/10">
                         <CardHeader className="p-4 pb-0">
                             <CardDescription className="text-xs uppercase tracking-wider font-bold text-blue-600">Searches</CardDescription>
@@ -640,6 +653,12 @@ const AdminPage = () => {
                         <Tabs value={adminView} onValueChange={(v: any) => setAdminView(v)} className="w-full md:w-auto">
                             <TabsList className="bg-muted p-1 rounded-xl">
                                 <TabsTrigger value="pending" className="rounded-lg px-4 font-bold">Pending</TabsTrigger>
+                                <TabsTrigger value="improvement_pending" className="rounded-lg px-4 font-bold flex gap-2">
+                                    Improvements
+                                    <Badge variant="secondary" className="h-4 p-0 px-1 text-[9px] bg-primary text-primary-foreground">
+                                        {allLyrics?.filter(l => l.status === "improvement_pending").length || 0}
+                                    </Badge>
+                                </TabsTrigger>
                                 <TabsTrigger value="approved" className="rounded-lg px-4 font-bold">Approved</TabsTrigger>
                                 <TabsTrigger value="rejected" className="rounded-lg px-4 font-bold">Rejected</TabsTrigger>
                                 <TabsTrigger value="all" className="rounded-lg px-4 font-bold">All</TabsTrigger>
@@ -677,9 +696,10 @@ const AdminPage = () => {
                                                 "font-bold uppercase text-[10px]",
                                                 lyric.status === "approved" ? "bg-emerald-500/10 text-emerald-600" :
                                                 lyric.status === "rejected" ? "bg-destructive/10 text-destructive" :
+                                                lyric.status === "improvement_pending" ? "bg-primary/10 text-primary" :
                                                 "bg-amber-500/10 text-amber-600"
                                             )}>
-                                                {lyric.status}
+                                                {lyric.status.replace('_', ' ')}
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
@@ -739,11 +759,17 @@ const AdminPage = () => {
                 <DialogContent className="max-w-4xl w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden">
                     <DialogHeader className="p-6 bg-gradient-to-br from-primary/20 via-primary/5 to-transparent">
                         <DialogTitle>{selectedLyric?.trackName}</DialogTitle>
-                        <DialogDescription className="flex items-center gap-4">
+                        <DialogDescription className="flex flex-wrap items-center gap-4">
                             <span>{selectedLyric?.artistName} • {selectedLyric?.albumName}</span>
                             <Badge variant="secondary" className="bg-primary/10 text-primary border-none">
-                                Submitted by: {selectedLyric?.submittedBy}
+                                Contributor: {selectedLyric?.submittedBy}
                             </Badge>
+                            {selectedLyric?.parentLyricId && (
+                                <Badge variant="outline" className="border-primary/30 text-primary flex gap-1">
+                                    <Sparkles className="h-3 w-3" />
+                                    IMPROVEMENT REQUEST
+                                </Badge>
+                            )}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -751,9 +777,37 @@ const AdminPage = () => {
                         <Tabs defaultValue="synced" className="h-full flex flex-col">
                             <TabsList className="w-fit mb-4">
                                 <TabsTrigger value="synced">Synced Lyrics</TabsTrigger>
+                                {selectedLyric?.parentLyricId && (
+                                    <TabsTrigger value="compare" className="bg-primary/5 text-primary">Compare Changes</TabsTrigger>
+                                )}
                                 <TabsTrigger value="playback">Preview</TabsTrigger>
                                 <TabsTrigger value="plain">Plain</TabsTrigger>
                             </TabsList>
+
+                            {selectedLyric?.parentLyricId && (
+                                <TabsContent value="compare" className="flex-1 overflow-hidden m-0">
+                                    <div className="grid grid-cols-2 h-full gap-4">
+                                        <div className="flex flex-col border rounded-xl overflow-hidden">
+                                            <div className="bg-muted p-2 text-[10px] font-bold uppercase tracking-widest flex justify-between">
+                                                <span>Original Version</span>
+                                                <span className="text-muted-foreground">Live Record</span>
+                                            </div>
+                                            <ScrollArea className="flex-1 p-4 bg-muted/5">
+                                                <pre className="text-xs font-mono whitespace-pre-wrap opacity-60 italic">{parentLyric?.syncedLyrics || "Loading original..."}</pre>
+                                            </ScrollArea>
+                                        </div>
+                                        <div className="flex flex-col border border-primary/20 rounded-xl overflow-hidden shadow-lg shadow-primary/5">
+                                            <div className="bg-primary/10 p-2 text-[10px] font-bold uppercase tracking-widest text-primary flex justify-between">
+                                                <span>Improvement Proposal</span>
+                                                <span className="animate-pulse">Suggested</span>
+                                            </div>
+                                            <ScrollArea className="flex-1 p-4 bg-primary/5">
+                                                <pre className="text-xs font-mono whitespace-pre-wrap font-bold text-primary">{selectedLyric?.syncedLyrics}</pre>
+                                            </ScrollArea>
+                                        </div>
+                                    </div>
+                                </TabsContent>
+                            )}
 
                             <TabsContent value="playback" className="flex-1 overflow-hidden m-0">
                                 <PlaybackPreview lyrics={selectedLyric?.syncedLyrics || ""} />

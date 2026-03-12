@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+// Last update trigger: 2026-03-12T03:30:00Z
 
 // ============ NOTIFICATIONS ============
 
@@ -37,6 +38,7 @@ export const markAllRead = mutation({
     },
 });
 
+// Publish or suggest improvement
 export const publish = mutation({
     args: {
         trackName: v.string(),
@@ -47,37 +49,41 @@ export const publish = mutation({
         syncedLyrics: v.string(),
         submittedBy: v.string(),
         submittedById: v.optional(v.id("users")),
+        parentLyricId: v.optional(v.id("lyrics")), // For improvements
     },
     handler: async (ctx, args) => {
         if (!args.syncedLyrics || args.syncedLyrics.trim().length === 0) {
             throw new Error("Only synced lyrics are allowed to be published");
         }
 
-        const existing = await ctx.db
+        // 1. Check if an approved version exists
+        const approvedVersion = await ctx.db
             .query("lyrics")
             .withIndex("by_track_artist", (q) =>
                 q.eq("trackName", args.trackName).eq("artistName", args.artistName)
             )
+            .filter((q) => q.eq(q.field("isApproved"), true))
             .unique();
 
-        if (existing) {
-            await ctx.db.patch(existing._id, {
-                ...args,
-                status: "pending",
-                isApproved: false,
-                updatedAt: Date.now(),
-            });
-            return existing._id;
+        // 2. Prevent duplicate creation of base tracks
+        if (approvedVersion && !args.parentLyricId) {
+            return { 
+                success: false, 
+                duplicate: true, 
+                originalId: approvedVersion._id,
+                message: "This song already exists. You can suggest an improvement to it instead." 
+            };
         }
 
         const id = await ctx.db.insert("lyrics", {
             ...args,
             searchHistory: 0,
-            status: "pending",
+            status: args.parentLyricId ? "improvement_pending" : "pending",
             isApproved: false,
             createdAt: Date.now(),
         });
-        return id;
+
+        return { success: true, id };
     },
 });
 
@@ -216,6 +222,7 @@ export const getStats = query({
             total: all.length,
             approved: all.filter(l => l.status === "approved").length,
             pending: all.filter(l => l.status === "pending").length,
+            improvements: all.filter(l => l.status === "improvement_pending").length,
             rejected: all.filter(l => l.status === "rejected").length,
             totalSearches: all.reduce((acc, current) => acc + (current.searchHistory || 0), 0)
         };
@@ -240,31 +247,53 @@ export const updateStatus = mutation({
         if (!lyric) throw new Error("Lyric not found");
 
         const isApproved = args.status === "approved";
-        await ctx.db.patch(args.id, {
-            status: args.status,
-            isApproved,
-            rejectionReason: args.rejectionReason,
-        });
+        
+        // Handle Improvement Merging
+        if (isApproved && lyric.status === "improvement_pending" && lyric.parentLyricId) {
+            // Apply changes to the parent record
+            await ctx.db.patch(lyric.parentLyricId, {
+                plainLyrics: lyric.plainLyrics,
+                syncedLyrics: lyric.syncedLyrics,
+                albumName: lyric.albumName || undefined,
+                updatedAt: Date.now()
+            });
+            // Mark the improvement record itself as approved/archived
+            await ctx.db.patch(args.id, { 
+                status: "approved", 
+                isApproved: true,
+                updatedAt: Date.now()
+            });
+        } else {
+            // Regular approval/rejection
+            await ctx.db.patch(args.id, {
+                status: args.status,
+                isApproved,
+                rejectionReason: args.rejectionReason,
+                updatedAt: Date.now()
+            });
+        }
 
-        // Create notification for submmiter if they have an account or name
-        if (lyric.submittedById || lyric.submittedBy) {
+        // Create notification for submmiter
+        if (lyric.submittedById) {
             const type = isApproved ? "approval" : "rejection";
-            const title = isApproved ? "Lyrics Approved!" : "Submission Update Needed";
+            const isImprovement = lyric.status === "improvement_pending";
+            const title = isApproved 
+                ? (isImprovement ? "Improvement Approved!" : "Lyrics Approved!") 
+                : "Submission Update Needed";
+            
             const message = isApproved
-                ? `Your synced lyrics for "${lyric.trackName}" have been approved and are now live!`
+                ? `Your ${isImprovement ? "improvement" : "synced lyrics"} for "${lyric.trackName}" been approved and are now live!`
                 : `Your submission for "${lyric.trackName}" was not approved. Reason: ${args.rejectionReason || "Please review and resubmit."}`;
 
-            if (lyric.submittedById) {
-                await ctx.db.insert("notifications", {
-                    userId: lyric.submittedById,
-                    type,
-                    title,
-                    message,
-                    lyricId: args.id,
-                    isRead: false,
-                    createdAt: Date.now(),
-                });
-            }
+            await ctx.db.insert("notifications", {
+                userId: lyric.submittedById,
+                type,
+                title,
+                message,
+                lyricId: args.id,
+                isRead: false,
+                createdAt: Date.now(),
+            });
         }
     },
 });
@@ -299,5 +328,22 @@ export const deleteLyric = mutation({
             throw new Error(validation.error || "Unauthorized");
         }
         await ctx.db.delete(args.id);
+    },
+});
+
+// Cleanup old notifications (older than 30 days)
+export const cleanupNotifications = mutation({
+    args: {},
+    handler: async (ctx) => {
+        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+        const oldNotifications = await ctx.db
+            .query("notifications")
+            .withIndex("by_created_at", (q) => q.lt("createdAt", thirtyDaysAgo))
+            .collect();
+        
+        for (const notification of oldNotifications) {
+            await ctx.db.delete(notification._id);
+        }
+        return oldNotifications.length;
     },
 });

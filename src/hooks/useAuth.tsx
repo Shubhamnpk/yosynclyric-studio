@@ -10,6 +10,7 @@ export interface User {
   _id: string;
   email: string;
   name?: string;
+  username?: string;
   role: UserRole;
 }
 
@@ -119,6 +120,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const hasRole = (requiredRole: UserRole): boolean => {
+    // If only guest access is required, everyone has access
+    if (requiredRole === "guest") return true;
+    
     if (!user) return false;
     
     const roleHierarchy: Record<UserRole, number> = {
@@ -131,8 +135,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const isUserLoading = !!token && currentUser === undefined;
+  const isGuest = user?.role === "guest" || !user;
 
-  const submissionUsername = user ? `@${user.name || user.email.split("@")[0]}` : guestName;
+  const submissionUsername = user 
+    ? (user.username ? `@${user.username}` : (user.name ? `@${user.name.toLowerCase().replace(/\s+/g, '')}` : `@${user.email.split("@")[0]}`)) 
+    : guestName;
 
   const value: AuthContextType = {
     user,

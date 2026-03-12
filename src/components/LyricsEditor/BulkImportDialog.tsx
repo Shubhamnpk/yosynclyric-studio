@@ -19,7 +19,7 @@ interface BulkImportDialogProps {
   onOpenChange: (open: boolean) => void;
   onImport: (text: string, replace: boolean) => void;
   hasExistingLyrics: boolean;
-  onImportLRC?: (text: string) => void;
+  onImportLRC?: (text: string, filename?: string) => void;
   onSearchOnline?: () => void;
 }
 
@@ -41,7 +41,7 @@ export const BulkImportDialog = ({
       reader.onload = (event) => {
         const content = event.target?.result as string;
         if (content) {
-          onImportLRC(content);
+          onImportLRC(content, file.name);
           onOpenChange(false);
         }
       };

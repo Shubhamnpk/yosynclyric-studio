@@ -20,12 +20,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { NotificationBell } from '@/components/Header/NotificationBell';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 const Dashboard = () => {
     const [projects, setProjects] = useState<LyricsProject[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const navigate = useNavigate();
-    const { logout, user } = useAuth();
+    const { logout, user, submissionUsername } = useAuth();
 
     useEffect(() => {
         setProjects(getAllProjects());
@@ -92,19 +94,22 @@ const Dashboard = () => {
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="lg" className="rounded-full px-3 h-11 w-11 p-0 flex items-center justify-center overflow-hidden border border-muted-foreground/10 hover:bg-muted">
-                                    <div className="bg-primary/10 w-full h-full flex items-center justify-center text-primary">
-                                        <User className="h-5 w-5" />
+                                    <div className="bg-primary/10 w-full h-full flex items-center justify-center text-primary font-black text-lg uppercase">
+                                        {user?.name ? user.name.charAt(0) : (user?.username ? user.username.charAt(0) : <User className="h-5 w-5" />)}
                                     </div>
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-56 mt-2">
                                 <div className="flex flex-col px-3 py-2">
-                                    <p className="text-sm font-medium">{user?.name || 'User'}</p>
-                                    <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-                                    <div className="mt-1">
-                                        <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full uppercase font-bold">
-                                            {user?.role}
-                                        </span>
+                                    <p className="text-sm font-bold tracking-tight truncate">{user?.name || submissionUsername}</p>
+                                    {user?.email && <p className="text-[10px] text-muted-foreground truncate">{user.email}</p>}
+                                    <div className="mt-1.5 flex items-center gap-2">
+                                        <Badge variant="outline" className={cn(
+                                            "text-[9px] uppercase font-black tracking-widest px-1.5 py-0 h-4 border-none",
+                                            user?.role === 'admin' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                                        )}>
+                                            {user?.role || 'Guest'}
+                                        </Badge>
                                     </div>
                                 </div>
                                 <DropdownMenuSeparator />

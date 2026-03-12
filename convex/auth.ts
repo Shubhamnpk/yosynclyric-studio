@@ -63,6 +63,28 @@ const verifyPassword = async (password: string, saltB64: string, expectedHash: s
     return computed === expectedHash;
 };
 
+// Generate a unique username based on a base name
+const generateUniqueUsername = async (ctx: any, baseName: string): Promise<string> => {
+    // Normalize base name: lowercase, alphanumeric and underscores only
+    let normalized = baseName.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (!normalized) normalized = "user";
+    
+    let username = normalized;
+    let counter = 1;
+    
+    while (true) {
+        const existing = await ctx.db
+            .query("users")
+            .withIndex("by_username", (q: any) => q.eq("username", username))
+            .unique();
+            
+        if (!existing) return username;
+        
+        username = `${normalized}${counter}`;
+        counter++;
+    }
+};
+
 
 // User types
 export type UserRole = "admin" | "user" | "guest";
@@ -93,6 +115,7 @@ export const getCurrentUser = query({
             _id: user._id,
             email: user.email,
             name: user.name,
+            username: user.username || (user.name || user.email?.split("@")[0] || "user").toLowerCase().replace(/[^a-z0-9_]/g, ''),
             role: user.role as UserRole,
         };
     },
@@ -126,8 +149,12 @@ export const ensureGuestUser = mutation({
             return existing._id;
         }
 
+        const baseName = args.name || "guest";
+        const username = await generateUniqueUsername(ctx, baseName);
+
         const userId = await ctx.db.insert("users", {
             name: args.name,
+            username,
             role: "guest",
             createdAt: Date.now(),
         });
@@ -158,9 +185,13 @@ export const register = mutation({
         const passwordSalt = generateSalt();
         const passwordHash = await hashPassword(args.password, passwordSalt);
 
+        const baseName = args.name || email.split("@")[0];
+        const username = await generateUniqueUsername(ctx, baseName);
+
         const userId = await ctx.db.insert("users", {
             email,
             name: args.name || email.split("@")[0],
+            username,
             role,
             passwordHash,
             passwordSalt,
@@ -186,6 +217,7 @@ export const register = mutation({
                 _id: user?._id,
                 email: user?.email,
                 name: user?.name,
+                username: user?.username,
                 role: user?.role as UserRole,
             }
         };
@@ -229,6 +261,13 @@ export const login = mutation({
         const token = generateToken();
         const expiresAt = Date.now() + SESSION_DURATION_MS;
 
+        // Generate uniquely identified username if missing (for legacy users)
+        let username = user.username;
+        if (!username) {
+            username = await generateUniqueUsername(ctx, user.name || email.split("@")[0]);
+            await ctx.db.patch(user._id, { username });
+        }
+
         // Store session in database
         await ctx.db.insert("sessions", {
             token,
@@ -244,6 +283,7 @@ export const login = mutation({
                 _id: user._id,
                 email: user.email,
                 name: user.name,
+                username,
                 role,
             }
         };
@@ -268,7 +308,12 @@ export const logout = mutation({
 
 // Update user profile (name and email)
 export const updateProfile = mutation({
-    args: { userId: v.id("users"), name: v.optional(v.string()), email: v.optional(v.string()) },
+    args: { 
+        userId: v.id("users"), 
+        name: v.optional(v.string()), 
+        email: v.optional(v.string()),
+        username: v.optional(v.string())
+    },
     handler: async (ctx, args) => {
         const updates: any = {};
         if (args.name !== undefined) updates.name = args.name;
@@ -283,6 +328,19 @@ export const updateProfile = mutation({
                  return { success: false, error: "Email already in use" };
              }
              updates.email = email;
+        }
+        if (args.username !== undefined) {
+             const username = args.username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+             if (username.length < 3) return { success: false, error: "Username too short" };
+             
+             const existing = await ctx.db
+                 .query("users")
+                 .withIndex("by_username", (q: any) => q.eq("username", username))
+                 .unique();
+             if (existing && existing._id !== args.userId) {
+                 return { success: false, error: "Username already in use" };
+             }
+             updates.username = username;
         }
         await ctx.db.patch(args.userId, updates);
         return { success: true };

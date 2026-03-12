@@ -24,7 +24,7 @@ interface SearchResult extends LRCLibSearchResult {
 interface LRCLibSearchDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onImport: (lyrics: string, synced: boolean) => void;
+    onImport: (lyrics: string, synced: boolean, metadata?: { title: string, artist: string, album?: string, duration?: number }) => void;
     initialQuery?: string;
 }
 
@@ -82,7 +82,7 @@ export const LRCLibSearchDialog = ({ open, onOpenChange, onImport, initialQuery 
 
     const incrementSearch = useMutation(api.lyrics.incrementSearchCount);
 
-    const handleImport = async (lyrics: string, synced: boolean, source: string, id: any) => {
+    const handleImport = async (lyrics: string, synced: boolean, source: string, id: any, metadata: { title: string, artist: string, album?: string, duration?: number }) => {
         if (source === 'yosync' && id) {
             try {
                 await incrementSearch({ id });
@@ -90,7 +90,7 @@ export const LRCLibSearchDialog = ({ open, onOpenChange, onImport, initialQuery 
                 console.error("Failed to increment search count", err);
             }
         }
-        onImport(lyrics, synced);
+        onImport(lyrics, synced, metadata);
         onOpenChange(false);
     };
 
@@ -193,7 +193,7 @@ export const LRCLibSearchDialog = ({ open, onOpenChange, onImport, initialQuery 
                                             variant="ghost"
                                             size="sm"
                                             className="text-xs h-9 px-4 font-bold hover:bg-primary/5 rounded-xl transition-all"
-                                            onClick={() => handleImport(result.plainLyrics, false, result.source, result.id)}
+                                            onClick={() => handleImport(result.plainLyrics, false, result.source, result.id, { title: result.trackName, artist: result.artistName, album: result.albumName, duration: result.duration })}
                                             disabled={!result.plainLyrics}
                                         >
                                             Plain Text
@@ -204,7 +204,7 @@ export const LRCLibSearchDialog = ({ open, onOpenChange, onImport, initialQuery 
                                                 "text-xs h-9 px-6 font-bold rounded-xl transition-all",
                                                 result.syncedLyrics ? "bg-primary shadow-lg shadow-primary/20" : "bg-muted text-muted-foreground"
                                             )}
-                                            onClick={() => handleImport(result.syncedLyrics, true, result.source, result.id)}
+                                            onClick={() => handleImport(result.syncedLyrics, true, result.source, result.id, { title: result.trackName, artist: result.artistName, album: result.albumName, duration: result.duration })}
                                             disabled={!result.syncedLyrics}
                                         >
                                             <Music className="h-3.5 w-3.5 mr-2" />

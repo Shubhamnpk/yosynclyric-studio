@@ -25,7 +25,7 @@ interface LyricsPanelProps {
   onClearTimestamp: (id: string) => void;
   onUpdateProject: (updates: Partial<LyricsProject>) => void;
   onImportBulkLyrics: (text: string, replace: boolean) => void;
-  onImportLRC: (text: string) => void;
+  onImportLRC: (text: string, filename?: string) => void;
   onSplitWords: (id: string) => void;
 
   onWordClick: (lineId: string, wordIndex: number) => void;
@@ -107,7 +107,7 @@ export const LyricsPanel = ({
           </div>
 
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3">
           <Input
             placeholder="Song Title"
             value={project.title}
@@ -118,6 +118,18 @@ export const LyricsPanel = ({
             placeholder="Artist Name"
             value={project.artist}
             onChange={(e) => onUpdateProject({ artist: e.target.value })}
+            className="bg-background h-9"
+          />
+          <Input
+            placeholder="Album Name"
+            value={project.album}
+            onChange={(e) => onUpdateProject({ album: e.target.value })}
+            className="bg-background h-9"
+          />
+          <Input
+            placeholder="Genre (Optional)"
+            value={project.genre}
+            onChange={(e) => onUpdateProject({ genre: e.target.value })}
             className="bg-background h-9"
           />
         </div>
@@ -180,11 +192,20 @@ export const LyricsPanel = ({
       <LRCLibSearchDialog
         open={lrcLibDialogOpen}
         onOpenChange={setLrcLibDialogOpen}
-        onImport={(lyrics, synced) => {
+        onImport={(lyrics, synced, meta) => {
           if (synced) {
-            onImportLRC(lyrics);
+            onImportLRC(lyrics); // useLyricsEditor's importLRC will also try to extract tags from text
           } else {
             onImportBulkLyrics(lyrics, true);
+          }
+          
+          if (meta && (!project.title || project.title === 'Untitled')) {
+            onUpdateProject({ 
+              title: meta.title, 
+              artist: meta.artist,
+              album: meta.album || project.album,
+              duration: meta.duration || project.duration
+            });
           }
           toast('Lyrics imported successfully');
         }}
