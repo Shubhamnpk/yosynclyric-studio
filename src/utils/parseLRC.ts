@@ -4,16 +4,16 @@ import { parseTimestamp } from './formatTime';
 /**
  * Parse an LRC file content into an array of LyricLines
  */
-export const parseLRC = (content: string): { lines: LyricLine[], metadata: { title?: string, artist?: string } } => {
+export const parseLRC = (content: string): { lines: LyricLine[], metadata: { title?: string, artist?: string, album?: string, duration?: number } } => {
     const lines: LyricLine[] = [];
-    const metadata: { title?: string, artist?: string } = {};
+    const metadata: { title?: string, artist?: string, album?: string, duration?: number } = {};
 
     const rawLines = content.split(/\r?\n/);
 
     // Regex for timestamps [mm:ss.xx] or [mm:ss]
     const timestampRegex = /\[(\d{2,}:\d{2}(?:\.\d{1,3})?)\]/g;
-    // Regex for metadata [ti:title] [ar:artist]
-    const metadataRegex = /\[(ti|ar):(.*)\]/;
+    // Regex for metadata tags like [ti:Title], [ar:Artist], [al:Album], [length:03:45]
+    const metadataRegex = /\[(ti|ar|al|length|duration):(.*)\]/i;
 
     for (const rawLine of rawLines) {
         const trimmed = rawLine.trim();
@@ -22,8 +22,16 @@ export const parseLRC = (content: string): { lines: LyricLine[], metadata: { tit
         // Check for metadata
         const metaMatch = trimmed.match(metadataRegex);
         if (metaMatch) {
-            if (metaMatch[1] === 'ti') metadata.title = metaMatch[2].trim();
-            if (metaMatch[1] === 'ar') metadata.artist = metaMatch[2].trim();
+            const key = metaMatch[1].toLowerCase();
+            const value = metaMatch[2].trim();
+            
+            if (key === 'ti') metadata.title = value;
+            if (key === 'ar') metadata.artist = value;
+            if (key === 'al') metadata.album = value;
+            if (key === 'length' || key === 'duration') {
+                const ms = parseTimestamp(value);
+                if (ms !== null) metadata.duration = Math.round(ms / 1000);
+            }
             continue;
         }
 

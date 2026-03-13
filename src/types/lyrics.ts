@@ -24,6 +24,7 @@ export interface LyricsProject {
   album: string;
   year: string;
   genre: string;
+  duration?: number;
   coverArtUrl: string | null;
   lines: LyricLine[];
   audioFile: File | null;

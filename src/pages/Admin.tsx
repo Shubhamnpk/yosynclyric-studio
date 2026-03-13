@@ -4,6 +4,7 @@ import { SEO } from "@/components/SEO";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
+import { useAuth } from "@/hooks/useAuth";
 import {
     Table,
     TableBody,
@@ -29,7 +30,6 @@ import {
     X,
     Shield,
     Clock,
-    FileText,
     ArrowLeft,
     Search,
     Trash2,
@@ -38,9 +38,9 @@ import {
     Edit3,
     History,
     CheckCircle2,
-    AlertCircle,
     Save,
-    Loader2
+    Loader2,
+    Sparkles
 } from "lucide-react";
 import {
     Dialog,
@@ -117,7 +117,6 @@ const PlaybackPreview = ({ lyrics, trackInfo }: { lyrics: string, trackInfo?: { 
     useEffect(() => {
         let interval: any;
         if (isPlaying && !videoId) {
-            // Estimate duration from last line if simulating
             const lastLineTime = lines[lines.length - 1]?.startTime ?? 0;
             setDuration(lastLineTime + 5000);
 
@@ -159,8 +158,6 @@ const PlaybackPreview = ({ lyrics, trackInfo }: { lyrics: string, trackInfo?: { 
         const nextTime = nonEmptyLines[i + 1]?.startTime ?? Infinity;
         return currentTime >= (l.startTime ?? 0) && currentTime < nextTime;
     });
-
-    const activeLineId = activeIndex !== -1 ? nonEmptyLines[activeIndex]?.startTime?.toString() : null;
 
     // ── Auto-scroll to center active line ──────────────────────────────
     useEffect(() => {
@@ -261,7 +258,7 @@ const PlaybackPreview = ({ lyrics, trackInfo }: { lyrics: string, trackInfo?: { 
 
                     <div className="flex flex-col md:items-end gap-2 w-full md:w-auto">
                         <div className="flex items-center gap-2">
-                            <Label className="text-[10px] font-bold uppercase text-muted-foreground">Speed</Label>
+                            <span className="text-[10px] font-bold uppercase text-muted-foreground">Speed</span>
                             {[1, 1.5, 2].map(speed => (
                                 <Button
                                     key={speed}
@@ -289,7 +286,6 @@ const PlaybackPreview = ({ lyrics, trackInfo }: { lyrics: string, trackInfo?: { 
                     </div>
                 </div>
 
-                {/* Music Slider */}
                 <div className="flex items-center gap-4 px-2">
                     <span className="text-[10px] font-mono font-bold text-muted-foreground w-10 tabular-nums">
                         {formatMs(currentTime)}
@@ -329,7 +325,6 @@ const PlaybackPreview = ({ lyrics, trackInfo }: { lyrics: string, trackInfo?: { 
                                 e.target.setVolume(100);
                             }}
                             onStateChange={(e) => {
-                                // 1 = playing, 2 = paused
                                 if (e.data === 1) setIsPlaying(true);
                                 if (e.data === 2) setIsPlaying(false);
                             }}
@@ -355,7 +350,6 @@ const PlaybackPreview = ({ lyrics, trackInfo }: { lyrics: string, trackInfo?: { 
                         }, 3000);
                     }}
                 >
-                    {/* Top spacer lets first line center */}
                     <div className="h-[25%] flex-shrink-0" />
 
                     <div className="px-8 md:px-12 space-y-6 pb-[40%] max-w-3xl mx-auto">
@@ -369,10 +363,7 @@ const PlaybackPreview = ({ lyrics, trackInfo }: { lyrics: string, trackInfo?: { 
                                     key={idx}
                                     ref={(el) => { if (el) lineRefs.current.set(idx, el); else lineRefs.current.delete(idx); }}
                                     className="cursor-pointer py-4"
-                                    style={{
-                                        opacity,
-                                        transition: `opacity 400ms ${EASE_SMOOTH}`,
-                                    }}
+                                    style={{ opacity, transition: `opacity 400ms ${EASE_SMOOTH}` }}
                                     onClick={() => handleSeek(line.startTime ?? 0)}
                                 >
                                     <p
@@ -382,9 +373,7 @@ const PlaybackPreview = ({ lyrics, trackInfo }: { lyrics: string, trackInfo?: { 
                                         )}
                                         style={{
                                             color: isActive ? 'var(--primary)' : 'currentColor',
-                                            textShadow: isActive
-                                                ? '0 0 30px hsla(var(--primary), 0.4)'
-                                                : 'none',
+                                            textShadow: isActive ? '0 0 30px hsla(var(--primary), 0.4)' : 'none',
                                             transition: `all 400ms ${EASE_SMOOTH}`,
                                         }}
                                     >
@@ -403,53 +392,74 @@ const PlaybackPreview = ({ lyrics, trackInfo }: { lyrics: string, trackInfo?: { 
     );
 };
 
+// Admin Page Component
 const AdminPage = () => {
     const navigate = useNavigate();
-    
-    // Server-side auth state
-    const [isAuthorized, setIsAuthorized] = useState(false);
+    const { user, isAuthenticated, login, logout, token } = useAuth();
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [isVerifying, setIsVerifying] = useState(false);
-    const [adminSecret, setAdminSecret] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
 
-    // Server-side auth verification mutation
-    const verifyAdminMutation = useMutation(api.lyrics.verifyAdmin);
-
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!password.trim()) {
-            toast.error("Please enter a password");
-            return;
-        }
-        
-        try {
-            setIsVerifying(true);
-            const isValid = await verifyAdminMutation({ password });
-            if (isValid) {
-                setIsAuthorized(true);
-                setAdminSecret(password); // Store the password as adminSecret for subsequent calls
-                toast.success("Welcome, Admin");
-            } else {
-                toast.error("Invalid password");
-            }
-        } catch (error) {
-            toast.error("Authentication failed");
-        } finally {
-            setIsVerifying(false);
-        }
-    };
-
-    const [adminView, setAdminView] = useState<"pending" | "approved" | "rejected" | "all">("pending");
+    const [adminView, setAdminView] = useState<"pending" | "improvement_pending" | "approved" | "rejected" | "all">("pending");
     const [searchQuery, setSearchQuery] = useState("");
 
-    // Data Hooks - Only initialize after server-side auth succeeds
-    const allLyrics = isAuthorized ? useQuery(api.lyrics.listAll, { adminSecret }) : undefined;
-    const stats = isAuthorized ? useQuery(api.lyrics.getStats, { adminSecret }) : undefined;
+    const [selectedLyric, setSelectedLyric] = useState<any>(null);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [editData, setEditData] = useState<any>(null);
+    const [rejectionReason, setRejectionReason] = useState("");
+    const [isRejecting, setIsRejecting] = useState(false);
+
+    // Data hooks - use skip to avoid calling when not authenticated
+    const allLyrics = useQuery(
+        api.lyrics.listAll,
+        token ? { token } : "skip"
+    );
+    const stats = useQuery(
+        api.lyrics.getStats,
+        token ? { token } : "skip"
+    );
     const updateStatus = useMutation(api.lyrics.updateStatus);
     const updateLyrics = useMutation(api.lyrics.updateLyrics);
     const deleteLyric = useMutation(api.lyrics.deleteLyric);
+    const migrateLegacy = useMutation(api.lyrics.migrateLegacyLyrics);
 
-    // Filter Logic
+    const parentLyric = useQuery(
+        api.lyrics.getById,
+        selectedLyric?.parentLyricId ? { id: selectedLyric.parentLyricId } : "skip"
+    );
+
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+        
+        const success = await login(email, password);
+        
+        if (success) {
+            toast.success("Welcome, Admin!");
+        } else {
+            toast.error("Invalid credentials");
+        }
+        setIsLoading(false);
+    };
+
+    const handleLogout = async () => {
+        await logout();
+        toast.success("Logged out successfully");
+    };
+
+    const handleMigrate = async () => {
+        if (!token) return;
+        setIsLoading(true);
+        try {
+            const result = await migrateLegacy({ token });
+            toast.success(`Successfully migrated ${result.updated} legacy records!`);
+        } catch (error) {
+            toast.error("Migration failed");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const filteredLyrics = allLyrics?.filter(l => {
         const matchesStatus = adminView === "all" ? true : l.status === adminView;
         const matchesQuery = !searchQuery ||
@@ -458,9 +468,6 @@ const AdminPage = () => {
         return matchesStatus && matchesQuery;
     });
 
-    const [selectedLyric, setSelectedLyric] = useState<any>(null);
-    const [isEditMode, setIsEditMode] = useState(false);
-    const [editData, setEditData] = useState<any>(null);
 
     const handleSelect = (lyric: any) => {
         setSelectedLyric(lyric);
@@ -470,22 +477,26 @@ const AdminPage = () => {
 
     const handleStatus = async (id: Id<"lyrics">, status: "approved" | "rejected") => {
         try {
-            await updateStatus({ id, status, adminSecret });
+            await updateStatus({ id, status, rejectionReason: status === "rejected" ? rejectionReason : undefined, token });
             toast.success(`Lyrics ${status} successfully`);
-            if (selectedLyric?._id === id) setSelectedLyric(null);
+            if (selectedLyric?._id === id) {
+                setSelectedLyric(null);
+                setRejectionReason("");
+                setIsRejecting(false);
+            }
         } catch (error) {
             toast.error(`Failed to update status`);
         }
     };
 
     const handleDelete = async (id: Id<"lyrics">) => {
-        if (!confirm("Are you sure you want to delete this lyrics entry? This cannot be undone.")) return;
+        if (!confirm("Are you sure you want to delete this lyrics entry?")) return;
         try {
-            await deleteLyric({ id, adminSecret });
-            toast.success("Lyrics deleted permanently");
+            await deleteLyric({ id, token: token || "" });
+            toast.success("Lyrics deleted");
             setSelectedLyric(null);
         } catch (error) {
-            toast.error("Failed to delete lyrics");
+            toast.error("Failed to delete");
         }
     };
 
@@ -498,18 +509,18 @@ const AdminPage = () => {
                 albumName: editData.albumName,
                 plainLyrics: editData.plainLyrics,
                 syncedLyrics: editData.syncedLyrics,
-                adminSecret,
+                token: token || "",
             });
             toast.success("Lyrics updated successfully");
             setIsEditMode(false);
-            // Update the selected lyric in view
             setSelectedLyric(editData);
         } catch (error) {
             toast.error("Failed to update lyrics");
         }
     };
 
-    if (!isAuthorized) {
+    // Login form
+    if (!isAuthenticated) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center p-6">
                 <Card className="w-full max-w-md border-none shadow-2xl bg-card/50 backdrop-blur-xl">
@@ -518,28 +529,38 @@ const AdminPage = () => {
                             <Shield className="h-8 w-8" />
                         </div>
                         <CardTitle className="text-3xl font-bold tracking-tight">Admin Access</CardTitle>
-                        <CardDescription className="text-lg">Enter password to manage lyrics database</CardDescription>
+                        <CardDescription className="text-lg">Sign in to manage lyrics</CardDescription>
                     </CardHeader>
                     <form onSubmit={handleLogin}>
                         <CardContent className="pt-6">
                             <div className="space-y-4">
                                 <div className="space-y-2">
                                     <Input
+                                        type="email"
+                                        placeholder="admin@example.com"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="h-12 bg-muted/50 border-none"
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Input
                                         type="password"
                                         placeholder="••••••••"
-                                        className="h-12 text-center text-lg tracking-widest bg-muted/50 border-none focus-visible:ring-1"
-                                        autoFocus
+                                        className="h-12 text-center text-lg tracking-widest bg-muted/50 border-none"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
+                                        required
                                     />
                                 </div>
                             </div>
                         </CardContent>
                         <CardFooter className="flex flex-col gap-3 pb-8">
-                            <Button type="submit" className="w-full h-12 text-lg font-bold rounded-xl shadow-lg shadow-primary/20">
-                                Authenticate
+                            <Button type="submit" className="w-full h-12 text-lg font-bold rounded-xl" disabled={isLoading}>
+                                {isLoading ? "Signing in..." : "Sign In"}
                             </Button>
-                            <Button variant="ghost" onClick={() => navigate("/")} className="w-full h-11 text-muted-foreground">
+                            <Button variant="ghost" onClick={() => navigate("/dashboard")} className="w-full h-11 text-muted-foreground">
                                 <ArrowLeft className="h-4 w-4 mr-2" />
                                 Back to Dashboard
                             </Button>
@@ -552,7 +573,7 @@ const AdminPage = () => {
 
     return (
         <div className="min-h-screen bg-background text-foreground p-6 md:p-12">
-            <SEO title="Admin Power Panel" description="Manage, edit, and approve community-submitted lyrics with advanced tools." />
+            <SEO title="Admin Power Panel" description="Manage, edit, and approve community-submitted lyrics." />
 
             <div className="max-w-7xl mx-auto space-y-12">
                 {/* Header */}
@@ -562,7 +583,7 @@ const AdminPage = () => {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => navigate('/')}
+                                onClick={() => navigate('/dashboard')}
                                 className="rounded-full h-10 w-10 mr-2"
                             >
                                 <ArrowLeft className="h-6 w-6" />
@@ -572,80 +593,75 @@ const AdminPage = () => {
                             </div>
                             <h1 className="text-3xl font-bold tracking-tight">Admin Power Panel</h1>
                         </div>
-                        <p className="text-muted-foreground text-lg">Central hub for quality control and database management.</p>
+                        <p className="text-muted-foreground text-lg">
+                            Welcome, {user?.name || user?.email}
+                        </p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setIsAuthorized(false);
-                                setPassword("");
-                                setAdminSecret("");
-                            }}
-                            className="rounded-full border-muted-foreground/20"
+                        <Button 
+                            variant="outline" 
+                            onClick={handleMigrate} 
+                            disabled={isLoading}
+                            className="rounded-full border-primary/20 hover:bg-primary/5 text-primary"
                         >
+                            <History className="h-4 w-4 mr-2" />
+                            Migrate Legacy
+                        </Button>
+                        <Button variant="outline" onClick={handleLogout} className="rounded-full">
                             Log Out
                         </Button>
                     </div>
                 </div>
 
                 {/* Stats Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <Card className="bg-muted/30 border-none shadow-sm overflow-hidden relative">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <Card className="bg-muted/30 border-none shadow-sm">
                         <CardHeader className="p-4 pb-0">
-                            <CardDescription className="text-xs uppercase tracking-wider font-bold">Total Lyrics</CardDescription>
+                            <CardDescription className="text-xs uppercase tracking-wider font-bold">Total</CardDescription>
                             <CardTitle className="text-2xl">{stats?.total || 0}</CardTitle>
                         </CardHeader>
-                        <div className="absolute top-2 right-2 p-2 rounded-lg bg-primary/10 text-primary">
-                            <Database className="h-4 w-4" />
-                        </div>
-                        <div className="h-1 w-full bg-primary/20 mt-4" />
                     </Card>
-                    <Card className="bg-emerald-500/5 border-emerald-500/10 shadow-sm overflow-hidden relative">
+                    <Card className="bg-emerald-500/5 border-emerald-500/10">
                         <CardHeader className="p-4 pb-0">
                             <CardDescription className="text-xs uppercase tracking-wider font-bold text-emerald-600">Approved</CardDescription>
                             <CardTitle className="text-2xl text-emerald-700">{stats?.approved || 0}</CardTitle>
                         </CardHeader>
-                        <div className="absolute top-2 right-2 p-2 rounded-lg bg-emerald-500/10 text-emerald-600">
-                            <CheckCircle2 className="h-4 w-4" />
-                        </div>
-                        <div className="h-1 w-full bg-emerald-500/20 mt-4" />
                     </Card>
-                    <Card className="bg-amber-500/5 border-amber-500/10 shadow-sm overflow-hidden relative">
+                    <Card className="bg-amber-500/5 border-amber-500/10">
                         <CardHeader className="p-4 pb-0">
                             <CardDescription className="text-xs uppercase tracking-wider font-bold text-amber-600">Pending</CardDescription>
                             <CardTitle className="text-2xl text-amber-700">{stats?.pending || 0}</CardTitle>
                         </CardHeader>
-                        <div className="absolute top-2 right-2 p-2 rounded-lg bg-amber-500/10 text-amber-600">
-                            <History className="h-4 w-4" />
-                        </div>
-                        <div className="h-1 w-full bg-amber-500/20 mt-4" />
                     </Card>
-                    <Card className="bg-blue-500/5 border-blue-500/10 shadow-sm overflow-hidden relative">
+                    <Card className="bg-primary/5 border-primary/10">
                         <CardHeader className="p-4 pb-0">
-                            <CardDescription className="text-xs uppercase tracking-wider font-bold text-blue-600">Total Imports</CardDescription>
+                            <CardDescription className="text-xs uppercase tracking-wider font-bold text-primary">Improvements</CardDescription>
+                            <CardTitle className="text-2xl text-primary font-black">{(stats as any)?.improvements || 0}</CardTitle>
+                        </CardHeader>
+                    </Card>
+                    <Card className="bg-blue-500/5 border-blue-500/10">
+                        <CardHeader className="p-4 pb-0">
+                            <CardDescription className="text-xs uppercase tracking-wider font-bold text-blue-600">Searches</CardDescription>
                             <CardTitle className="text-2xl text-blue-700">{stats?.totalSearches || 0}</CardTitle>
                         </CardHeader>
-                        <div className="absolute top-2 right-2 p-2 rounded-lg bg-blue-500/10 text-blue-600">
-                            <Activity className="h-4 w-4" />
-                        </div>
-                        <div className="h-1 w-full bg-blue-500/20 mt-4" />
                     </Card>
                 </div>
 
-                {/* Main Content Areas */}
+                {/* Main Content */}
                 <div className="space-y-6">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <Tabs
-                            value={adminView}
-                            onValueChange={(v: any) => setAdminView(v)}
-                            className="w-full md:w-auto"
-                        >
+                        <Tabs value={adminView} onValueChange={(v: any) => setAdminView(v)} className="w-full md:w-auto">
                             <TabsList className="bg-muted p-1 rounded-xl">
                                 <TabsTrigger value="pending" className="rounded-lg px-4 font-bold">Pending</TabsTrigger>
+                                <TabsTrigger value="improvement_pending" className="rounded-lg px-4 font-bold flex gap-2">
+                                    Improvements
+                                    <Badge variant="secondary" className="h-4 p-0 px-1 text-[9px] bg-primary text-primary-foreground">
+                                        {allLyrics?.filter(l => l.status === "improvement_pending").length || 0}
+                                    </Badge>
+                                </TabsTrigger>
                                 <TabsTrigger value="approved" className="rounded-lg px-4 font-bold">Approved</TabsTrigger>
                                 <TabsTrigger value="rejected" className="rounded-lg px-4 font-bold">Rejected</TabsTrigger>
-                                <TabsTrigger value="all" className="rounded-lg px-4 font-bold">All Library</TabsTrigger>
+                                <TabsTrigger value="all" className="rounded-lg px-4 font-bold">All</TabsTrigger>
                             </TabsList>
                         </Tabs>
 
@@ -660,283 +676,197 @@ const AdminPage = () => {
                         </div>
                     </div>
 
-                    <div className="bg-card border rounded-2xl overflow-hidden shadow-xl shadow-primary/5">
+                    <div className="bg-card border rounded-2xl overflow-hidden shadow-xl">
                         <Table>
                             <TableHeader className="bg-muted/30">
-                                <TableRow className="border-b border-muted">
-                                    <TableHead className="font-bold py-4">Status</TableHead>
-                                    <TableHead className="font-bold py-4">Track / Artist</TableHead>
-                                    <TableHead className="font-bold py-4">Duration</TableHead>
-                                    <TableHead className="font-bold py-4 text-center">Engagement</TableHead>
-                                    <TableHead className="font-bold py-4 text-right">Actions</TableHead>
+                                <TableRow>
+                                    <TableHead className="font-bold">Status</TableHead>
+                                    <TableHead className="font-bold">Track / Artist</TableHead>
+                                    <TableHead className="font-bold">Duration</TableHead>
+                                    <TableHead className="font-bold">Contributor</TableHead>
+                                    <TableHead className="font-bold text-center">Searches</TableHead>
+                                    <TableHead className="font-bold text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {filteredLyrics?.map((lyric) => (
-                                    <TableRow key={lyric._id} className="hover:bg-muted/20 transition-colors border-b border-muted/50 last:border-0">
-                                        <TableCell className="py-5">
-                                            <Badge
-                                                variant="outline"
-                                                className={cn(
-                                                    "font-bold uppercase text-[10px] px-2 py-0.5 rounded-full border-none",
-                                                    lyric.status === "approved" ? "bg-emerald-500/10 text-emerald-600" :
-                                                        lyric.status === "rejected" ? "bg-destructive/10 text-destructive" :
-                                                            "bg-amber-500/10 text-amber-600"
-                                                )}
-                                            >
-                                                {lyric.status}
+                                    <TableRow key={lyric._id} className="hover:bg-muted/20">
+                                        <TableCell>
+                                            <Badge variant="outline" className={cn(
+                                                "font-bold uppercase text-[10px]",
+                                                lyric.status === "approved" ? "bg-emerald-500/10 text-emerald-600" :
+                                                lyric.status === "rejected" ? "bg-destructive/10 text-destructive" :
+                                                lyric.status === "improvement_pending" ? "bg-primary/10 text-primary" :
+                                                "bg-amber-500/10 text-amber-600"
+                                            )}>
+                                                {lyric.status.replace('_', ' ')}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="py-5">
+                                        <TableCell>
                                             <div className="flex flex-col">
-                                                <span className="font-bold text-base text-foreground line-clamp-1">{lyric.trackName}</span>
-                                                <span className="text-sm text-primary font-medium line-clamp-1">{lyric.artistName}</span>
+                                                <span className="font-bold">{lyric.trackName}</span>
+                                                <span className="text-sm text-primary">{lyric.artistName}</span>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="py-5">
-                                            <div className="flex items-center gap-1.5 text-sm font-medium">
+                                        <TableCell>
+                                            <div className="flex items-center gap-1.5 text-sm">
                                                 <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                                                 {Math.floor(lyric.duration / 60)}:{(lyric.duration % 60).toString().padStart(2, '0')}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-center py-5">
-                                            <div className="flex flex-col items-center">
-                                                <span className="text-sm font-bold">{lyric.searchHistory || 0}</span>
-                                                <span className="text-[10px] text-muted-foreground">IMPORTS</span>
+                                        <TableCell>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                                                    {lyric.submittedBy?.[0]?.toUpperCase() || 'L'}
+                                                </div>
+                                                <span className="text-xs font-medium truncate max-w-[120px]">
+                                                    {lyric.submittedBy}
+                                                </span>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-right py-5">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-10 w-10 rounded-full hover:bg-primary/10 hover:text-primary transition-all"
-                                                    onClick={() => handleSelect(lyric)}
-                                                >
+                                        <TableCell className="text-center">{lyric.searchHistory || 0}</TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex justify-end gap-2">
+                                                <Button variant="ghost" size="icon" onClick={() => handleSelect(lyric)}>
                                                     <Edit3 className="h-4 w-4" />
                                                 </Button>
                                                 {lyric.status !== "approved" && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-10 w-10 rounded-full text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-950 transition-all"
-                                                        onClick={() => handleStatus(lyric._id, "approved")}
-                                                    >
+                                                    <Button variant="ghost" size="icon" className="text-emerald-600" onClick={() => handleStatus(lyric._id, "approved")}>
                                                         <Check className="h-4 w-4" />
                                                     </Button>
                                                 )}
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-10 w-10 rounded-full text-destructive hover:bg-destructive/10 transition-all"
-                                                    onClick={() => handleDelete(lyric._id)}
-                                                >
+                                                <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDelete(lyric._id)}>
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
                                         </TableCell>
                                     </TableRow>
                                 ))}
-                                {filteredLyrics?.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={5} className="h-96 text-center">
-                                            <div className="flex flex-col items-center justify-center py-12">
-                                                <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-6">
-                                                    <Search className="h-10 w-10 text-muted-foreground/30" />
-                                                </div>
-                                                <h3 className="text-lg font-bold">No results found</h3>
-                                                <p className="text-muted-foreground mt-1 px-4 max-w-sm mx-auto text-center">
-                                                    Try changing your filters or searching for something else.
-                                                </p>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                )}
                             </TableBody>
                         </Table>
                     </div>
                 </div>
             </div>
 
-            {/* Powerful Preview & Edit Dialog */}
-            <Dialog open={!!selectedLyric} onOpenChange={(open) => !open && setSelectedLyric(null)}>
-                <DialogContent className="max-w-4xl w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl">
-                    <DialogHeader className="p-6 md:p-8 bg-gradient-to-br from-primary/20 via-primary/5 to-transparent border-b border-primary/10">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                            <div className="flex-1">
-                                {isEditMode ? (
-                                    <div className="space-y-2 max-w-md">
-                                        <Input
-                                            value={editData.trackName}
-                                            onChange={(e) => setEditData({ ...editData, trackName: e.target.value })}
-                                            className="h-10 text-xl font-bold bg-background/50 border-primary/30"
-                                            placeholder="Track Name"
-                                        />
-                                        <div className="flex gap-2">
-                                            <Input
-                                                value={editData.artistName}
-                                                onChange={(e) => setEditData({ ...editData, artistName: e.target.value })}
-                                                className="h-9 text-sm bg-background/50 border-primary/20 font-medium"
-                                                placeholder="Artist Name"
-                                            />
-                                            <Input
-                                                value={editData.albumName || ""}
-                                                onChange={(e) => setEditData({ ...editData, albumName: e.target.value })}
-                                                className="h-9 text-sm bg-background/50 border-primary/20"
-                                                placeholder="Album (Optional)"
-                                            />
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <DialogTitle className="text-3xl font-bold tracking-tight">
-                                            {selectedLyric?.trackName}
-                                        </DialogTitle>
-                                        <DialogDescription className="text-lg font-medium text-primary mt-1">
-                                            {selectedLyric?.artistName} • {selectedLyric?.albumName || 'Unknown Album'}
-                                        </DialogDescription>
-                                    </>
-                                )}
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-3">
-                                {isEditMode ? (
-                                    <>
-                                        <Button variant="outline" onClick={() => setIsEditMode(false)} className="rounded-xl px-6">
-                                            Cancel
-                                        </Button>
-                                        <Button onClick={handleUpdate} className="rounded-xl px-8 shadow-lg shadow-primary/20 bg-primary">
-                                            <Save className="h-4 w-4 mr-2" />
-                                            Save Changes
-                                        </Button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => setIsEditMode(true)}
-                                            className="rounded-xl px-6 border-primary/20 hover:bg-primary/5 text-primary"
-                                        >
-                                            <Edit3 className="h-4 w-4 mr-2" />
-                                            Edit Content
-                                        </Button>
-                                        <div className="h-8 w-px bg-muted mx-2 hidden md:block" />
-                                        <Button
-                                            variant="destructive"
-                                            onClick={() => handleStatus(selectedLyric._id, "rejected")}
-                                            className="rounded-xl px-6"
-                                            disabled={selectedLyric?.status === "rejected"}
-                                        >
-                                            <X className="h-4 w-4 mr-2" />
-                                            Reject
-                                        </Button>
-                                        <Button
-                                            variant="default"
-                                            onClick={() => handleStatus(selectedLyric._id, "approved")}
-                                            className="bg-emerald-600 hover:bg-emerald-700 rounded-xl px-8 shadow-lg shadow-emerald-500/20"
-                                            disabled={selectedLyric?.status === "approved"}
-                                        >
-                                            <Check className="h-4 w-4 mr-2" />
-                                            Approve
-                                        </Button>
-                                    </>
-                                )}
-                            </div>
-                        </div>
+            {/* Edit Dialog */}
+            <Dialog open={!!selectedLyric} onOpenChange={(open) => {
+                if (!open) {
+                    setSelectedLyric(null);
+                    setRejectionReason("");
+                    setIsRejecting(false);
+                }
+            }}>
+                <DialogContent className="max-w-4xl w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden">
+                    <DialogHeader className="p-6 bg-gradient-to-br from-primary/20 via-primary/5 to-transparent">
+                        <DialogTitle>{selectedLyric?.trackName}</DialogTitle>
+                        <DialogDescription className="flex flex-wrap items-center gap-4">
+                            <span>{selectedLyric?.artistName} • {selectedLyric?.albumName}</span>
+                            <Badge variant="secondary" className="bg-primary/10 text-primary border-none">
+                                Contributor: {selectedLyric?.submittedBy}
+                            </Badge>
+                            {selectedLyric?.parentLyricId && (
+                                <Badge variant="outline" className="border-primary/30 text-primary flex gap-1">
+                                    <Sparkles className="h-3 w-3" />
+                                    IMPROVEMENT REQUEST
+                                </Badge>
+                            )}
+                        </DialogDescription>
                     </DialogHeader>
 
-                    <div className="flex-1 overflow-hidden p-6 md:p-8">
+                    <div className="flex-1 overflow-hidden p-6">
                         <Tabs defaultValue="synced" className="h-full flex flex-col">
-                            <TabsList className="w-fit mb-6 h-12 p-1 bg-muted/50 rounded-2xl">
-                                <TabsTrigger value="synced" className="rounded-xl px-8 font-bold">Synced Lyrics</TabsTrigger>
-                                <TabsTrigger value="playback" className="rounded-xl px-8 font-bold flex items-center gap-2">
-                                    <Music2 className="h-4 w-4" />
-                                    Playback Check
-                                </TabsTrigger>
-                                <TabsTrigger value="plain" className="rounded-xl px-8 font-bold">Plain Text</TabsTrigger>
+                            <TabsList className="w-fit mb-4">
+                                <TabsTrigger value="synced">Synced Lyrics</TabsTrigger>
+                                {selectedLyric?.parentLyricId && (
+                                    <TabsTrigger value="compare" className="bg-primary/5 text-primary">Compare Changes</TabsTrigger>
+                                )}
+                                <TabsTrigger value="playback">Preview</TabsTrigger>
+                                <TabsTrigger value="plain">Plain</TabsTrigger>
                             </TabsList>
 
+                            {selectedLyric?.parentLyricId && (
+                                <TabsContent value="compare" className="flex-1 overflow-hidden m-0">
+                                    <div className="grid grid-cols-2 h-full gap-4">
+                                        <div className="flex flex-col border rounded-xl overflow-hidden">
+                                            <div className="bg-muted p-2 text-[10px] font-bold uppercase tracking-widest flex justify-between">
+                                                <span>Original Version</span>
+                                                <span className="text-muted-foreground">Live Record</span>
+                                            </div>
+                                            <ScrollArea className="flex-1 p-4 bg-muted/5">
+                                                <pre className="text-xs font-mono whitespace-pre-wrap opacity-60 italic">{parentLyric?.syncedLyrics || "Loading original..."}</pre>
+                                            </ScrollArea>
+                                        </div>
+                                        <div className="flex flex-col border border-primary/20 rounded-xl overflow-hidden shadow-lg shadow-primary/5">
+                                            <div className="bg-primary/10 p-2 text-[10px] font-bold uppercase tracking-widest text-primary flex justify-between">
+                                                <span>Improvement Proposal</span>
+                                                <span className="animate-pulse">Suggested</span>
+                                            </div>
+                                            <ScrollArea className="flex-1 p-4 bg-primary/5">
+                                                <pre className="text-xs font-mono whitespace-pre-wrap font-bold text-primary">{selectedLyric?.syncedLyrics}</pre>
+                                            </ScrollArea>
+                                        </div>
+                                    </div>
+                                </TabsContent>
+                            )}
+
                             <TabsContent value="playback" className="flex-1 overflow-hidden m-0">
-                                <PlaybackPreview
-                                    lyrics={selectedLyric?.syncedLyrics || ""}
-                                    trackInfo={{
-                                        track: selectedLyric?.trackName,
-                                        artist: selectedLyric?.artistName
-                                    }}
-                                />
+                                <PlaybackPreview lyrics={selectedLyric?.syncedLyrics || ""} />
                             </TabsContent>
 
                             <TabsContent value="synced" className="flex-1 overflow-hidden m-0">
-                                <div className="h-full flex flex-col gap-4">
-                                    <div className="flex items-center gap-2 p-3 bg-blue-500/5 text-blue-600 rounded-xl border border-blue-500/10 text-xs font-medium">
-                                        <Clock className="h-4 w-4" />
-                                        <span>Synchronized timestamps are preserved in [mm:ss.xx] format.</span>
-                                    </div>
-                                    <div className="flex-1 border rounded-3xl bg-muted/10 p-4 md:p-6 overflow-hidden focus-within:ring-2 ring-primary/20 transition-all">
-                                        {isEditMode ? (
-                                            <Textarea
-                                                className="h-full resize-none bg-transparent border-none focus-visible:ring-0 p-0 font-mono text-sm leading-relaxed"
-                                                value={editData.syncedLyrics}
-                                                onChange={(e) => setEditData({ ...editData, syncedLyrics: e.target.value })}
-                                            />
-                                        ) : (
-                                            <ScrollArea className="h-full">
-                                                <pre className="text-xs md:text-sm font-mono leading-relaxed whitespace-pre-wrap">
-                                                    {selectedLyric?.syncedLyrics}
-                                                </pre>
-                                            </ScrollArea>
-                                        )}
-                                    </div>
-                                </div>
+                                <ScrollArea className="h-full">
+                                    <pre className="text-sm font-mono whitespace-pre-wrap">{selectedLyric?.syncedLyrics}</pre>
+                                </ScrollArea>
                             </TabsContent>
 
                             <TabsContent value="plain" className="flex-1 overflow-hidden m-0">
-                                <div className="h-full border rounded-3xl bg-muted/10 p-4 md:p-6 overflow-hidden focus-within:ring-2 ring-primary/20 transition-all">
-                                    {isEditMode ? (
-                                        <Textarea
-                                            className="h-full resize-none bg-transparent border-none focus-visible:ring-0 p-0 font-sans text-sm leading-relaxed"
-                                            value={editData.plainLyrics}
-                                            onChange={(e) => setEditData({ ...editData, plainLyrics: e.target.value })}
-                                        />
-                                    ) : (
-                                        <ScrollArea className="h-full">
-                                            <pre className="text-xs md:text-sm font-sans leading-relaxed whitespace-pre-wrap">
-                                                {selectedLyric?.plainLyrics}
-                                            </pre>
-                                        </ScrollArea>
-                                    )}
-                                </div>
+                                <ScrollArea className="h-full">
+                                    <pre className="text-sm whitespace-pre-wrap">{selectedLyric?.plainLyrics}</pre>
+                                </ScrollArea>
                             </TabsContent>
                         </Tabs>
                     </div>
 
-                    <DialogFooter className="px-8 py-6 bg-muted/30 border-t border-muted border-none flex sm:justify-between items-center">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
-                            <Activity className="h-3 w-3" />
-                            <span>Unique Contribution ID: {selectedLyric?._id}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="rounded-full h-10 border-red-500/20 text-red-600 hover:bg-red-50"
-                                onClick={() => {
-                                    const query = encodeURIComponent(`${selectedLyric?.trackName} ${selectedLyric?.artistName} lyrics`);
-                                    window.open(`https://www.youtube.com/results?search_query=${query}`, '_blank');
-                                }}
-                            >
-                                <Youtube className="h-4 w-4 mr-2" />
-                                Find on YouTube
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive hover:bg-destructive/10 h-10 w-10 p-0 rounded-full"
-                                onClick={() => handleDelete(selectedLyric._id)}
-                            >
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
-                        </div>
+                    <DialogFooter className="p-4 border-t flex flex-col gap-4">
+                        {isRejecting ? (
+                            <div className="w-full space-y-3 p-4 bg-destructive/5 rounded-xl border border-destructive/10">
+                                <Label className="text-xs font-bold uppercase text-destructive">Rejection Reason</Label>
+                                <Textarea 
+                                    placeholder="Tell the contributor why this was rejected (e.g., incorrect timestamps, typos...)"
+                                    value={rejectionReason}
+                                    onChange={(e) => setRejectionReason(e.target.value)}
+                                    className="min-h-[100px] bg-background border-destructive/20 focus:border-destructive"
+                                />
+                                <div className="flex justify-end gap-2">
+                                    <Button variant="ghost" onClick={() => setIsRejecting(false)}>Cancel</Button>
+                                    <Button 
+                                        variant="destructive" 
+                                        disabled={!rejectionReason.trim()}
+                                        onClick={() => handleStatus(selectedLyric._id, "rejected")}
+                                    >
+                                        Confirm Rejection
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex w-full justify-between items-center">
+                                <div className="flex gap-2">
+                                    <Button variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(selectedLyric._id)}>
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Delete Forever
+                                    </Button>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button variant="outline" className="border-destructive/20 text-destructive hover:bg-destructive/5" onClick={() => setIsRejecting(true)}>
+                                        Reject Submission
+                                    </Button>
+                                    <Button className="bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/20" onClick={() => handleStatus(selectedLyric._id, "approved")}>
+                                        <Check className="h-4 w-4 mr-2" />
+                                        Approve & Publish
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

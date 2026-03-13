@@ -27,9 +27,14 @@ import {
   Presentation,
   Tag,
   Film,
+  LogOut,
 } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { NotificationBell } from './NotificationBell';
 
 interface HeaderProps {
   project: LyricsProject;
@@ -74,8 +79,17 @@ export const Header = ({
   onExportVideo,
   leftElement,
 }: HeaderProps) => {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
   const handleExport = (format: ExportFormat) => {
     downloadLyrics(project, format);
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    toast.success('Logged out successfully');
+    navigate('/login');
   };
 
   return (
@@ -218,8 +232,17 @@ export const Header = ({
               <Trash2 className="h-4 w-4 mr-2" />
               Clear all timestamps
             </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <NotificationBell />
 
         {/* Export */}
         <DropdownMenu>
