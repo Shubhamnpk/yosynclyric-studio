@@ -62,6 +62,71 @@ import YouTube from "react-youtube";
 
 const EASE_SMOOTH = 'cubic-bezier(0.4, 0, 0.2, 1)';
 
+const getLineDiff = (left: string, right: string) => {
+    if (left === right) {
+        return {
+            leftPrefix: left,
+            leftChanged: '',
+            leftSuffix: '',
+            rightPrefix: right,
+            rightChanged: '',
+            rightSuffix: '',
+            changed: false,
+        };
+    }
+
+    let prefixLength = 0;
+    const minLength = Math.min(left.length, right.length);
+    while (prefixLength < minLength && left[prefixLength] === right[prefixLength]) {
+        prefixLength++;
+    }
+
+    let leftSuffixLength = 0;
+    let rightSuffixLength = 0;
+    while (
+        left.length - leftSuffixLength - 1 >= prefixLength &&
+        right.length - rightSuffixLength - 1 >= prefixLength &&
+        left[left.length - leftSuffixLength - 1] === right[right.length - rightSuffixLength - 1]
+    ) {
+        leftSuffixLength++;
+        rightSuffixLength++;
+    }
+
+    return {
+        leftPrefix: left.slice(0, prefixLength),
+        leftChanged: left.slice(prefixLength, left.length - leftSuffixLength),
+        leftSuffix: left.slice(left.length - leftSuffixLength),
+        rightPrefix: right.slice(0, prefixLength),
+        rightChanged: right.slice(prefixLength, right.length - rightSuffixLength),
+        rightSuffix: right.slice(right.length - rightSuffixLength),
+        changed: true,
+    };
+};
+
+const renderDiffText = (
+    prefix: string,
+    changedText: string,
+    suffix: string,
+    tone: "existing" | "improved",
+) => (
+    <>
+        <span>{prefix}</span>
+        {changedText && (
+            <span
+                className={cn(
+                    "rounded px-0.5 py-px",
+                    tone === "existing"
+                        ? "bg-red-500/15 text-red-700 dark:text-red-300"
+                        : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                )}
+            >
+                {changedText}
+            </span>
+        )}
+        <span>{suffix}</span>
+    </>
+);
+
 const getYoutubeId = (url: string) => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
     const match = url.match(regExp);
@@ -427,6 +492,22 @@ const AdminPage = () => {
         api.lyrics.getById,
         selectedLyric?.parentLyricId ? { id: selectedLyric.parentLyricId } : "skip"
     );
+    const comparisonRows = useMemo(() => {
+        const existingLines = parentLyric?.syncedLyrics?.split('\n') ?? [];
+        const improvedLines = selectedLyric?.syncedLyrics?.split('\n') ?? [];
+
+        return Array.from(
+            { length: Math.max(existingLines.length, improvedLines.length) },
+            (_, index) => {
+                const existingLine = existingLines[index] ?? '';
+                const improvedLine = improvedLines[index] ?? '';
+                return {
+                    index,
+                    diff: getLineDiff(existingLine, improvedLine),
+                };
+            }
+        );
+    }, [parentLyric?.syncedLyrics, selectedLyric?.syncedLyrics]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -786,23 +867,61 @@ const AdminPage = () => {
 
                             {selectedLyric?.parentLyricId && (
                                 <TabsContent value="compare" className="flex-1 overflow-hidden m-0">
-                                    <div className="grid grid-cols-2 h-full gap-4">
-                                        <div className="flex flex-col border rounded-xl overflow-hidden">
+                                    <div className="grid h-full grid-cols-1 gap-4 md:grid-cols-2">
+                                        <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border">
                                             <div className="bg-muted p-2 text-[10px] font-bold uppercase tracking-widest flex justify-between">
                                                 <span>Original Version</span>
                                                 <span className="text-muted-foreground">Live Record</span>
                                             </div>
-                                            <ScrollArea className="flex-1 p-4 bg-muted/5">
-                                                <pre className="text-xs font-mono whitespace-pre-wrap opacity-60 italic">{parentLyric?.syncedLyrics || "Loading original..."}</pre>
+                                            <ScrollArea className="flex-1 bg-muted/5">
+                                                <div className="space-y-1 p-4 font-mono text-xs leading-relaxed">
+                                                    {comparisonRows.length > 0 ? comparisonRows.map((row) => (
+                                                        <div
+                                                            key={`existing-${row.index}`}
+                                                            className={cn(
+                                                                "rounded px-2 py-1 whitespace-pre-wrap break-words text-muted-foreground/80",
+                                                                row.diff.changed && "border border-red-500/20 bg-red-500/8"
+                                                            )}
+                                                        >
+                                                            {renderDiffText(
+                                                                row.diff.leftPrefix,
+                                                                row.diff.leftChanged,
+                                                                row.diff.leftSuffix,
+                                                                "existing"
+                                                            )}
+                                                        </div>
+                                                    )) : (
+                                                        <div className="rounded px-2 py-1 text-muted-foreground/60 italic">
+                                                            Loading original...
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </ScrollArea>
                                         </div>
-                                        <div className="flex flex-col border border-primary/20 rounded-xl overflow-hidden shadow-lg shadow-primary/5">
+                                        <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-primary/20 shadow-lg shadow-primary/5">
                                             <div className="bg-primary/10 p-2 text-[10px] font-bold uppercase tracking-widest text-primary flex justify-between">
                                                 <span>Improvement Proposal</span>
                                                 <span className="animate-pulse">Suggested</span>
                                             </div>
-                                            <ScrollArea className="flex-1 p-4 bg-primary/5">
-                                                <pre className="text-xs font-mono whitespace-pre-wrap font-bold text-primary">{selectedLyric?.syncedLyrics}</pre>
+                                            <ScrollArea className="flex-1 bg-primary/5">
+                                                <div className="space-y-1 p-4 font-mono text-xs leading-relaxed">
+                                                    {comparisonRows.map((row) => (
+                                                        <div
+                                                            key={`improved-${row.index}`}
+                                                            className={cn(
+                                                                "rounded px-2 py-1 whitespace-pre-wrap break-words text-primary/90",
+                                                                row.diff.changed && "border border-emerald-500/20 bg-emerald-500/8"
+                                                            )}
+                                                        >
+                                                            {renderDiffText(
+                                                                row.diff.rightPrefix,
+                                                                row.diff.rightChanged,
+                                                                row.diff.rightSuffix,
+                                                                "improved"
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </ScrollArea>
                                         </div>
                                     </div>

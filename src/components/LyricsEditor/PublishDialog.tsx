@@ -32,14 +32,79 @@ interface PublishDialogProps {
     audioDuration?: number;
 }
 
+const getLineDiff = (left: string, right: string) => {
+    if (left === right) {
+        return {
+            leftPrefix: left,
+            leftChanged: '',
+            leftSuffix: '',
+            rightPrefix: right,
+            rightChanged: '',
+            rightSuffix: '',
+            changed: false,
+        };
+    }
+
+    let prefixLength = 0;
+    const minLength = Math.min(left.length, right.length);
+    while (prefixLength < minLength && left[prefixLength] === right[prefixLength]) {
+        prefixLength++;
+    }
+
+    let leftSuffixLength = 0;
+    let rightSuffixLength = 0;
+    while (
+        left.length - leftSuffixLength - 1 >= prefixLength &&
+        right.length - rightSuffixLength - 1 >= prefixLength &&
+        left[left.length - leftSuffixLength - 1] === right[right.length - rightSuffixLength - 1]
+    ) {
+        leftSuffixLength++;
+        rightSuffixLength++;
+    }
+
+    return {
+        leftPrefix: left.slice(0, prefixLength),
+        leftChanged: left.slice(prefixLength, left.length - leftSuffixLength),
+        leftSuffix: left.slice(left.length - leftSuffixLength),
+        rightPrefix: right.slice(0, prefixLength),
+        rightChanged: right.slice(prefixLength, right.length - rightSuffixLength),
+        rightSuffix: right.slice(right.length - rightSuffixLength),
+        changed: true,
+    };
+};
+
+const renderDiffText = (
+    text: string,
+    changedText: string,
+    suffix: string,
+    tone: 'existing' | 'improved',
+) => (
+    <>
+        <span>{text}</span>
+        {changedText && (
+            <span
+                className={cn(
+                    "rounded px-0.5 py-px",
+                    tone === 'existing'
+                        ? "bg-red-500/15 text-red-700 dark:text-red-300"
+                        : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                )}
+            >
+                {changedText}
+            </span>
+        )}
+        <span>{suffix}</span>
+    </>
+);
+
 export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: PublishDialogProps) => {
     const [trackName, setTrackName] = useState(project.title);
     const [artistName, setArtistName] = useState(project.artist);
     const [albumName, setAlbumName] = useState(project.album || '');
     const [duration, setDuration] = useState(audioDuration ? Math.round(audioDuration) : (project.duration || 0));
 
-    const [publishToLrcLib, setPublishToLrcLib] = useState(true);
-    const [publishToYosync, setPublishToYosync] = useState(true);
+    const [publishToLrcLib, setPublishToLrcLib] = useState(false);
+    const [publishToYosync, setPublishToYosync] = useState(false);
 
     const publishMutation = useMutation(api.lyrics.publish);
     const ensureGuestMutation = useMutation(api.auth.ensureGuestUser);
@@ -77,6 +142,46 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
     const [publishing, setPublishing] = useState(false);
     const [status, setStatus] = useState('');
 
+    const plainLyrics = project.lines.map(l => l.text).join('\n');
+    const syncedLyrics = project.lines.map(l => {
+        const totalSeconds = (l.startTime || 0) / 1000;
+        const mm = Math.floor(totalSeconds / 60);
+        const ss = Math.floor(totalSeconds % 60);
+        const xx = Math.floor((totalSeconds % 1) * 100);
+        const timeTag = `[${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}.${xx.toString().padStart(2, '0')}]`;
+        return `${timeTag} ${l.text}`;
+    }).join('\n');
+    const existingLines = parentLyric?.syncedLyrics?.split('\n') ?? [];
+    const improvedLines = syncedLyrics.split('\n');
+    const comparisonRows = Array.from(
+        { length: Math.max(existingLines.length, improvedLines.length) },
+        (_, index) => {
+            const existingLine = existingLines[index] ?? '';
+            const improvedLine = improvedLines[index] ?? '';
+            return {
+                index,
+                existingLine,
+                improvedLine,
+                diff: getLineDiff(existingLine, improvedLine),
+            };
+        }
+    );
+
+    const duplicateSuggestions = useQuery(
+        api.lyrics.findPossibleDuplicates,
+        open && trackName.trim() && artistName.trim()
+            ? {
+                trackName,
+                artistName,
+                duration: duration || undefined,
+                plainLyrics,
+                syncedLyrics,
+            }
+            : "skip"
+    );
+
+    const exactDuplicateSuggestion = duplicateSuggestions?.find((item: any) => item.isStrongDuplicate) || null;
+
     const handlePublish = async () => {
         if (!isFormValid) {
             toast.error('Please check all fields and ensure the project has lyrics');
@@ -96,15 +201,7 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
         setPublishing(true);
 
         try {
-            const plainLyrics = project.lines.map(l => l.text).join('\n');
-            const syncedLyrics = project.lines.map(l => {
-                const totalSeconds = (l.startTime || 0) / 1000;
-                const mm = Math.floor(totalSeconds / 60);
-                const ss = Math.floor(totalSeconds % 60);
-                const xx = Math.floor((totalSeconds % 1) * 100);
-                const timeTag = `[${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}.${xx.toString().padStart(2, '0')}]`;
-                return `${timeTag} ${l.text}`;
-            }).join('\n');
+            let yosyncDuplicateHandled = false;
 
             // 1. Publish to Yosync (Convex)
             if (publishToYosync) {
@@ -134,15 +231,17 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                 const publishResult: any = await publishMutation(publishArgs);
 
                 if (publishResult.duplicate) {
-                    setIsDuplicate(true);
+                    yosyncDuplicateHandled = true;
+                    setIsDuplicate(false);
                     setOriginalId(publishResult.originalId);
-                    toast.warning("Duplicate detected");
-                    setPublishing(false);
-                    setStatus('');
-                    return;
-                }
-
-                if (publishResult.success) {
+                    setParentLyricId(publishResult.originalId);
+                    setShowComparison(true);
+                    toast.warning(
+                        publishToLrcLib
+                            ? "Duplicate found in Yosync. Switched to improvement mode and continuing LRCLIB publish."
+                            : "Duplicate found in Yosync. Switched to improvement mode."
+                    );
+                } else if (publishResult.success) {
                     toast.success(parentLyricId ? 'Improvement suggested! Awaiting review.' : 'Submitted to Yosync! Awaiting admin approval.');
                 }
             }
@@ -167,7 +266,9 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                 }
             }
 
-            onOpenChange(false);
+            if (!yosyncDuplicateHandled || publishToLrcLib) {
+                onOpenChange(false);
+            }
 
         } catch (error: any) {
             console.error(error);
@@ -180,7 +281,7 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[550px] w-[95vw] p-0 overflow-hidden border-none shadow-2xl bg-background/95 backdrop-blur-xl">
+            <DialogContent className="flex max-h-[92vh] w-[95vw] flex-col overflow-hidden border-none bg-background/95 p-0 shadow-2xl backdrop-blur-xl sm:max-w-[550px]">
                 <DialogHeader className="p-6 md:p-8 bg-gradient-to-br from-primary/20 via-primary/5 to-transparent border-b border-primary/10">
                     <div className="flex items-center gap-3 mb-2">
                         <div className="p-2 rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
@@ -190,9 +291,6 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                             {parentLyricId ? "Submit Improvement" : "Publish Lyrics"}
                         </DialogTitle>
                     </div>
-                    <DialogDescription className="text-sm text-balance">
-                        Share your synchronized lyrics with the world. Your contribution helps music lovers everywhere.
-                    </DialogDescription>
                     <div className="flex items-center gap-2 mt-4 text-[11px] font-medium text-primary/70 bg-primary/10 px-3 py-1.5 rounded-full w-fit max-w-full truncate border border-primary/20">
                         <User className="h-3 w-3 shrink-0" />
                         <span>Contributing as: </span>
@@ -200,7 +298,8 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                     </div>
                 </DialogHeader>
 
-                <div className="p-6 md:p-8 space-y-6">
+                <div className="flex-1 overflow-y-auto">
+                    <div className="p-6 md:p-8 space-y-6">
                     {/* Status Alerts */}
                     {isDuplicate ? (
                         <div className="flex flex-col gap-3 p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 animate-in fade-in slide-in-from-top-2">
@@ -220,11 +319,82 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                                 onClick={() => {
                                     setParentLyricId(originalId);
                                     setIsDuplicate(false);
+                                    setShowComparison(true);
                                     toast.info("Switched to Improvement Mode. You can now suggest your changes.");
                                 }}
                             >
-                                Submit as Improvement Instead
+                                Review as Improvement
                             </Button>
+                        </div>
+                    ) : !parentLyricId && duplicateSuggestions && duplicateSuggestions.length > 0 ? (
+                        <div className="space-y-4 p-4 rounded-2xl bg-primary/5 border border-primary/15 animate-in fade-in slide-in-from-top-2">
+                            <div className="flex items-start gap-3">
+                                <LayoutGrid className="h-5 w-5 mt-0.5 shrink-0 text-primary" />
+                                <div className="space-y-1">
+                                    <p className="font-bold text-sm text-foreground">Possible existing matches found</p>
+                                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                                        We found similar tracks in Yosync before you publish. If one of these is the same song, submit your work as an improvement instead of creating a duplicate.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                {duplicateSuggestions.slice(0, 3).map((item: any) => (
+                                    <button
+                                        key={item.id}
+                                        type="button"
+                                        className={cn(
+                                            "w-full text-left rounded-xl border p-3 transition-all hover:border-primary/40 hover:bg-primary/[0.03]",
+                                            item.isStrongDuplicate ? "border-amber-500/30 bg-amber-500/5" : "border-border bg-background/70"
+                                        )}
+                                        onClick={() => {
+                                            setParentLyricId(item.id);
+                                            setOriginalId(item.id);
+                                            setShowComparison(Boolean(item.isStrongDuplicate || exactDuplicateSuggestion));
+                                            toast.info("Improvement mode enabled for the closest existing track.");
+                                        }}
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-semibold truncate">{item.trackName}</p>
+                                                <p className="text-[11px] text-muted-foreground truncate">
+                                                    {item.artistName}
+                                                    {item.albumName ? ` • ${item.albumName}` : ''}
+                                                </p>
+                                            </div>
+                                            <Badge variant={item.isApproved ? "default" : "secondary"} className="shrink-0">
+                                                {item.isApproved ? "Approved" : item.status}
+                                            </Badge>
+                                        </div>
+                                        <div className="mt-2 flex flex-wrap gap-1.5">
+                                            {item.matchReasons.map((reason: string) => (
+                                                <Badge key={reason} variant="outline" className="text-[10px]">
+                                                    {reason}
+                                                </Badge>
+                                            ))}
+                                            {item.durationDelta !== null && (
+                                                <Badge variant="outline" className="text-[10px]">
+                                                    Δ {item.durationDelta}s
+                                                </Badge>
+                                            )}
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                            {exactDuplicateSuggestion && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full bg-primary/10 border-primary/20 hover:bg-primary/15 text-[10px] font-black uppercase tracking-widest h-9"
+                                    onClick={() => {
+                                        setParentLyricId(exactDuplicateSuggestion.id);
+                                        setOriginalId(exactDuplicateSuggestion.id);
+                                        setShowComparison(true);
+                                        toast.info("Closest duplicate selected. You can now submit this as an improvement.");
+                                    }}
+                                >
+                                    Use Closest Match as Improvement Base
+                                </Button>
+                            )}
                         </div>
                     ) : parentLyricId ? (
                         <div className="space-y-4 animate-in fade-in zoom-in-95">
@@ -250,33 +420,57 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                             </div>
                             
                             {showComparison && parentLyric && (
-                                <div className="grid grid-cols-2 gap-px bg-muted rounded-xl overflow-hidden border border-muted animate-in slide-in-from-top-2">
-                                    <div className="flex flex-col bg-background h-[200px]">
+                                <div className="grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-muted bg-muted animate-in slide-in-from-top-2 md:grid-cols-2">
+                                    <div className="flex min-h-0 flex-col bg-background md:max-h-[min(42vh,24rem)]">
                                         <div className="p-2 border-b bg-muted/30 flex items-center gap-2">
                                             <FileText className="h-3 w-3 text-muted-foreground" />
                                             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Existing Version</span>
                                         </div>
-                                        <ScrollArea className="flex-1 p-3 bg-muted/5">
-                                            <pre className="text-[9px] leading-relaxed whitespace-pre-wrap font-mono text-muted-foreground/80 selection:bg-primary/20">
-                                                {parentLyric.syncedLyrics}
-                                            </pre>
+                                        <ScrollArea className="max-h-[28vh] flex-1 bg-muted/5 md:max-h-none">
+                                            <div className="space-y-1 p-3 font-mono text-[9px] leading-relaxed">
+                                                {comparisonRows.map((row) => (
+                                                    <div
+                                                        key={`existing-${row.index}`}
+                                                        className={cn(
+                                                            "rounded px-1.5 py-1 whitespace-pre-wrap break-words text-muted-foreground/80 selection:bg-primary/20",
+                                                            row.diff.changed && "border border-red-500/20 bg-red-500/8"
+                                                        )}
+                                                    >
+                                                        {renderDiffText(
+                                                            row.diff.leftPrefix,
+                                                            row.diff.leftChanged,
+                                                            row.diff.leftSuffix,
+                                                            'existing'
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </ScrollArea>
                                     </div>
-                                    <div className="flex flex-col bg-background h-[200px]">
+                                    <div className="flex min-h-0 flex-col bg-background md:max-h-[min(42vh,24rem)]">
                                         <div className="p-2 border-b bg-primary/5 flex items-center gap-2">
                                             <Sparkles className="h-3 w-3 text-primary" />
                                             <span className="text-[10px] font-bold uppercase tracking-wider text-primary">Your Improved Version</span>
                                         </div>
-                                        <ScrollArea className="flex-1 p-3 bg-primary/[0.02]">
-                                            <pre className="text-[9px] leading-relaxed whitespace-pre-wrap font-mono text-primary/80 selection:bg-primary/20">
-                                                {project.lines.map(l => {
-                                                    const totalSeconds = (l.startTime || 0) / 1000;
-                                                    const mm = Math.floor(totalSeconds / 60);
-                                                    const ss = Math.floor(totalSeconds % 60);
-                                                    const xx = Math.floor((totalSeconds % 1) * 100);
-                                                    return `[${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}.${xx.toString().padStart(2, '0')}] ${l.text}`;
-                                                }).join('\n')}
-                                            </pre>
+                                        <ScrollArea className="max-h-[28vh] flex-1 bg-primary/[0.02] md:max-h-none">
+                                            <div className="space-y-1 p-3 font-mono text-[9px] leading-relaxed">
+                                                {comparisonRows.map((row) => (
+                                                    <div
+                                                        key={`improved-${row.index}`}
+                                                        className={cn(
+                                                            "rounded px-1.5 py-1 whitespace-pre-wrap break-words text-primary/80 selection:bg-primary/20",
+                                                            row.diff.changed && "border border-emerald-500/20 bg-emerald-500/8"
+                                                        )}
+                                                    >
+                                                        {renderDiffText(
+                                                            row.diff.rightPrefix,
+                                                            row.diff.rightChanged,
+                                                            row.diff.rightSuffix,
+                                                            'improved'
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </ScrollArea>
                                     </div>
                                 </div>
@@ -413,6 +607,7 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                             </div>
                         </div>
                     )}
+                    </div>
                 </div>
 
                 <DialogFooter className="p-6 md:p-8 bg-muted/20 border-t border-muted-foreground/10 flex flex-col sm:flex-row gap-3">
