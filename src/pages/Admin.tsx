@@ -26,6 +26,13 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import {
     Check,
     X,
     Shield,
@@ -40,7 +47,8 @@ import {
     CheckCircle2,
     Save,
     Loader2,
-    Sparkles
+    Sparkles,
+    MoreVertical
 } from "lucide-react";
 import {
     Dialog,
@@ -473,6 +481,7 @@ const AdminPage = () => {
     const [editData, setEditData] = useState<any>(null);
     const [rejectionReason, setRejectionReason] = useState("");
     const [isRejecting, setIsRejecting] = useState(false);
+    const [activeReviewTab, setActiveReviewTab] = useState<"synced" | "compare" | "playback" | "plain">("synced");
 
     // Data hooks - use skip to avoid calling when not authenticated
     const allLyrics = useQuery(
@@ -486,6 +495,7 @@ const AdminPage = () => {
     const updateStatus = useMutation(api.lyrics.updateStatus);
     const updateLyrics = useMutation(api.lyrics.updateLyrics);
     const deleteLyric = useMutation(api.lyrics.deleteLyric);
+    const restoreVersion = useMutation(api.lyrics.restoreVersion);
     const migrateLegacy = useMutation(api.lyrics.migrateLegacyLyrics);
 
     const parentLyric = useQuery(
@@ -508,6 +518,45 @@ const AdminPage = () => {
             }
         );
     }, [parentLyric?.syncedLyrics, selectedLyric?.syncedLyrics]);
+    const metadataChanges = useMemo(() => {
+        if (!selectedLyric?.parentLyricId || !parentLyric) return [];
+
+        const fields = [
+            { key: "trackName", label: "Track" },
+            { key: "artistName", label: "Artist" },
+            { key: "albumName", label: "Album" },
+            { key: "duration", label: "Duration" },
+        ] as const;
+
+        return fields
+            .map((field) => {
+                const from = parentLyric[field.key] ?? "";
+                const to = selectedLyric[field.key] ?? "";
+                return {
+                    ...field,
+                    from,
+                    to,
+                    changed: String(from) !== String(to),
+                };
+            })
+            .filter((item) => item.changed);
+    }, [parentLyric, selectedLyric]);
+    const siblingPendingImprovements = useMemo(() => {
+        if (!selectedLyric?.parentLyricId || !allLyrics) return [];
+        return allLyrics.filter((lyric) =>
+            lyric.status === "improvement_pending" &&
+            lyric.parentLyricId === selectedLyric.parentLyricId &&
+            lyric._id !== selectedLyric._id
+        );
+    }, [allLyrics, selectedLyric]);
+    const currentCanonicalLyric = selectedLyric?.parentLyricId ? parentLyric : selectedLyric;
+    const rootLyricId = selectedLyric?.parentLyricId || selectedLyric?._id || null;
+    const versionHistory = useMemo(() => {
+        if (!rootLyricId || !allLyrics) return [];
+        return allLyrics
+            .filter((lyric) => lyric.parentLyricId === rootLyricId)
+            .sort((a, b) => b.createdAt - a.createdAt);
+    }, [allLyrics, rootLyricId]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -543,10 +592,11 @@ const AdminPage = () => {
 
     const filteredLyrics = allLyrics?.filter(l => {
         const matchesStatus = adminView === "all" ? true : l.status === adminView;
+        const hideRevisionInApproved = adminView === "approved" ? !l.parentLyricId : true;
         const matchesQuery = !searchQuery ||
             l.trackName.toLowerCase().includes(searchQuery.toLowerCase()) ||
             l.artistName.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesStatus && matchesQuery;
+        return matchesStatus && hideRevisionInApproved && matchesQuery;
     });
 
 
@@ -554,16 +604,24 @@ const AdminPage = () => {
         setSelectedLyric(lyric);
         setEditData({ ...lyric });
         setIsEditMode(false);
+        setActiveReviewTab(lyric.parentLyricId ? "compare" : "synced");
     };
 
-    const handleStatus = async (id: Id<"lyrics">, status: "approved" | "rejected") => {
+    const handleStatus = async (id: Id<"lyrics">, status: "approved" | "rejected", options?: { mergeMetadata?: boolean }) => {
         try {
-            await updateStatus({ id, status, rejectionReason: status === "rejected" ? rejectionReason : undefined, token });
+            await updateStatus({
+                id,
+                status,
+                rejectionReason: status === "rejected" ? rejectionReason : undefined,
+                mergeMetadata: status === "approved" ? options?.mergeMetadata : undefined,
+                token
+            });
             toast.success(`Lyrics ${status} successfully`);
             if (selectedLyric?._id === id) {
                 setSelectedLyric(null);
                 setRejectionReason("");
                 setIsRejecting(false);
+                setActiveReviewTab("synced");
             }
         } catch (error) {
             toast.error(`Failed to update status`);
@@ -597,6 +655,15 @@ const AdminPage = () => {
             setSelectedLyric(editData);
         } catch (error) {
             toast.error("Failed to update lyrics");
+        }
+    };
+
+    const handleRestoreVersion = async (id: Id<"lyrics">, restoreMetadata: boolean) => {
+        try {
+            await restoreVersion({ id, restoreMetadata, token });
+            toast.success(restoreMetadata ? "Version restored with metadata" : "Lyrics version restored");
+        } catch (error) {
+            toast.error("Failed to restore version");
         }
     };
 
@@ -654,7 +721,7 @@ const AdminPage = () => {
 
     return (
         <div className="min-h-screen bg-background text-foreground p-6 md:p-12">
-            <SEO title="Admin Power Panel" description="Manage, edit, and approve community-submitted lyrics." />
+            <SEO title="Admin Review Panel" description="Review, edit, approve, reject, and restore lyric submissions." />
 
             <div className="max-w-7xl mx-auto space-y-12">
                 {/* Header */}
@@ -672,7 +739,7 @@ const AdminPage = () => {
                             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
                                 <Shield className="h-6 w-6" />
                             </div>
-                            <h1 className="text-3xl font-bold tracking-tight">Admin Power Panel</h1>
+                            <h1 className="text-3xl font-bold tracking-tight">Admin Review Panel</h1>
                         </div>
                         <p className="text-muted-foreground text-lg">
                             Welcome, {user?.name || user?.email}
@@ -704,7 +771,7 @@ const AdminPage = () => {
                     </Card>
                     <Card className="bg-emerald-500/5 border-emerald-500/10">
                         <CardHeader className="p-4 pb-0">
-                            <CardDescription className="text-xs uppercase tracking-wider font-bold text-emerald-600">Approved</CardDescription>
+                            <CardDescription className="text-xs uppercase tracking-wider font-bold text-emerald-600">Approved Songs</CardDescription>
                             <CardTitle className="text-2xl text-emerald-700">{stats?.approved || 0}</CardTitle>
                         </CardHeader>
                     </Card>
@@ -716,7 +783,7 @@ const AdminPage = () => {
                     </Card>
                     <Card className="bg-primary/5 border-primary/10">
                         <CardHeader className="p-4 pb-0">
-                            <CardDescription className="text-xs uppercase tracking-wider font-bold text-primary">Improvements</CardDescription>
+                            <CardDescription className="text-xs uppercase tracking-wider font-bold text-primary">Pending Improvements</CardDescription>
                             <CardTitle className="text-2xl text-primary font-black">{(stats as any)?.improvements || 0}</CardTitle>
                         </CardHeader>
                     </Card>
@@ -771,7 +838,11 @@ const AdminPage = () => {
                             </TableHeader>
                             <TableBody>
                                 {filteredLyrics?.map((lyric) => (
-                                    <TableRow key={lyric._id} className="hover:bg-muted/20">
+                                    <TableRow
+                                        key={lyric._id}
+                                        className="group cursor-pointer hover:bg-muted/20"
+                                        onClick={() => handleSelect(lyric)}
+                                    >
                                         <TableCell>
                                             <Badge variant="outline" className={cn(
                                                 "font-bold uppercase text-[10px]",
@@ -787,6 +858,11 @@ const AdminPage = () => {
                                             <div className="flex flex-col">
                                                 <span className="font-bold">{lyric.trackName}</span>
                                                 <span className="text-sm text-primary">{lyric.artistName}</span>
+                                                {lyric.parentLyricId && (
+                                                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                                                        Improvement submission
+                                                    </span>
+                                                )}
                                             </div>
                                         </TableCell>
                                         <TableCell>
@@ -807,19 +883,40 @@ const AdminPage = () => {
                                         </TableCell>
                                         <TableCell className="text-center">{lyric.searchHistory || 0}</TableCell>
                                         <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <Button variant="ghost" size="icon" onClick={() => handleSelect(lyric)}>
-                                                    <Edit3 className="h-4 w-4" />
-                                                </Button>
-                                                {lyric.status !== "approved" && (
-                                                    <Button variant="ghost" size="icon" className="text-emerald-600" onClick={() => handleStatus(lyric._id, "approved")}>
-                                                        <Check className="h-4 w-4" />
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-muted-foreground opacity-70 transition-opacity group-hover:opacity-100"
+                                                    >
+                                                        <MoreVertical className="h-4 w-4" />
                                                     </Button>
-                                                )}
-                                                <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDelete(lyric._id)}>
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" className="w-48">
+                                                    <DropdownMenuItem onClick={() => handleSelect(lyric)}>
+                                                        <Edit3 className="mr-2 h-4 w-4" />
+                                                        Open Details
+                                                    </DropdownMenuItem>
+                                                    {lyric.status !== "approved" && (
+                                                        <DropdownMenuItem
+                                                            onClick={() => handleStatus(lyric._id, "approved", { mergeMetadata: false })}
+                                                            className="text-emerald-600 focus:bg-emerald-500/10 focus:text-emerald-700 dark:focus:text-emerald-300"
+                                                        >
+                                                            <Check className="mr-2 h-4 w-4" />
+                                                            Approve
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleDelete(lyric._id)}
+                                                        className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                                    >
+                                                        <Trash2 className="mr-2 h-4 w-4" />
+                                                        Delete
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -835,6 +932,7 @@ const AdminPage = () => {
                     setSelectedLyric(null);
                     setRejectionReason("");
                     setIsRejecting(false);
+                    setActiveReviewTab("synced");
                 }
             }}>
                 <DialogContent className="max-w-4xl w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden">
@@ -843,23 +941,26 @@ const AdminPage = () => {
                         <DialogDescription className="flex flex-wrap items-center gap-4">
                             <span>{selectedLyric?.artistName} • {selectedLyric?.albumName}</span>
                             <Badge variant="secondary" className="bg-primary/10 text-primary border-none">
-                                Contributor: {selectedLyric?.submittedBy}
+                                Submitted by: {selectedLyric?.submittedBy}
                             </Badge>
                             {selectedLyric?.parentLyricId && (
                                 <Badge variant="outline" className="border-primary/30 text-primary flex gap-1">
                                     <Sparkles className="h-3 w-3" />
-                                    IMPROVEMENT REQUEST
+                                    Improvement Submission
                                 </Badge>
                             )}
                         </DialogDescription>
                     </DialogHeader>
 
                     <div className="flex-1 overflow-hidden p-6">
-                        <Tabs defaultValue="synced" className="h-full flex flex-col">
+                        <Tabs value={activeReviewTab} onValueChange={(v) => setActiveReviewTab(v as typeof activeReviewTab)} className="h-full flex flex-col">
                             <TabsList className="w-fit mb-4">
                                 <TabsTrigger value="synced">Synced Lyrics</TabsTrigger>
                                 {selectedLyric?.parentLyricId && (
-                                    <TabsTrigger value="compare" className="bg-primary/5 text-primary">Compare Changes</TabsTrigger>
+                                    <TabsTrigger value="compare" className="bg-primary/5 text-primary">Compare</TabsTrigger>
+                                )}
+                                {rootLyricId && versionHistory.length > 0 && (
+                                    <TabsTrigger value="history">History</TabsTrigger>
                                 )}
                                 <TabsTrigger value="playback">Preview</TabsTrigger>
                                 <TabsTrigger value="plain">Plain</TabsTrigger>
@@ -867,11 +968,48 @@ const AdminPage = () => {
 
                             {selectedLyric?.parentLyricId && (
                                 <TabsContent value="compare" className="flex-1 overflow-hidden m-0">
-                                    <div className="grid h-full grid-cols-1 gap-4 md:grid-cols-2">
+                                    <div className="mb-4 space-y-3">
+                                        {metadataChanges.length > 0 && (
+                                            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                                                <div className="mb-3 flex items-center gap-2">
+                                                    <Sparkles className="h-4 w-4 text-amber-600" />
+                                                    <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                                                        Metadata differences detected. These fields will only update if you approve with metadata.
+                                                    </span>
+                                                </div>
+                                                <div className="grid gap-2 md:grid-cols-2">
+                                                    {metadataChanges.map((change) => (
+                                                        <div key={change.key} className="rounded-lg border border-amber-500/15 bg-background/80 p-3">
+                                                            <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                                                {change.label}
+                                                            </div>
+                                                            <div className="text-xs text-red-600 dark:text-red-300">
+                                                                Current: {String(change.from || "—")}
+                                                            </div>
+                                                            <div className="text-xs text-emerald-600 dark:text-emerald-300">
+                                                                Proposed: {String(change.to || "—")}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {siblingPendingImprovements.length > 0 && (
+                                            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+                                                <div className="text-xs font-bold uppercase tracking-wider text-primary">
+                                                    Other pending improvements
+                                                </div>
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    {siblingPendingImprovements.length} other pending improvement{siblingPendingImprovements.length === 1 ? "" : "s"} for this same parent lyric exist. Review carefully before approving.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="grid h-[calc(100%-7rem)] grid-cols-1 gap-4 md:grid-cols-2">
                                         <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border">
                                             <div className="bg-muted p-2 text-[10px] font-bold uppercase tracking-widest flex justify-between">
                                                 <span>Original Version</span>
-                                                <span className="text-muted-foreground">Live Record</span>
+                                                <span className="text-muted-foreground">Canonical</span>
                                             </div>
                                             <ScrollArea className="flex-1 bg-muted/5">
                                                 <div className="space-y-1 p-4 font-mono text-xs leading-relaxed">
@@ -900,7 +1038,7 @@ const AdminPage = () => {
                                         </div>
                                         <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-primary/20 shadow-lg shadow-primary/5">
                                             <div className="bg-primary/10 p-2 text-[10px] font-bold uppercase tracking-widest text-primary flex justify-between">
-                                                <span>Improvement Proposal</span>
+                                                <span>Submitted Revision</span>
                                                 <span className="animate-pulse">Suggested</span>
                                             </div>
                                             <ScrollArea className="flex-1 bg-primary/5">
@@ -925,6 +1063,83 @@ const AdminPage = () => {
                                             </ScrollArea>
                                         </div>
                                     </div>
+                                </TabsContent>
+                            )}
+
+                            {rootLyricId && versionHistory.length > 0 && (
+                                <TabsContent value="history" className="flex-1 overflow-hidden m-0">
+                                    <ScrollArea className="h-full pr-2">
+                                        <div className="space-y-3">
+                                            {versionHistory.map((version) => {
+                                                const isCurrentLiveVersion =
+                                                    !!currentCanonicalLyric &&
+                                                    version.status === "approved" &&
+                                                    version.syncedLyrics === currentCanonicalLyric.syncedLyrics &&
+                                                    version.plainLyrics === currentCanonicalLyric.plainLyrics &&
+                                                    version.trackName === currentCanonicalLyric.trackName &&
+                                                    version.artistName === currentCanonicalLyric.artistName &&
+                                                    (version.albumName || "") === (currentCanonicalLyric.albumName || "") &&
+                                                    version.duration === currentCanonicalLyric.duration;
+
+                                                return (
+                                                <div key={version._id} className="rounded-xl border bg-card/60 p-4">
+                                                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                                        <div className="space-y-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className={cn(
+                                                                        "text-[10px] uppercase font-bold",
+                                                                        version.status === "approved" ? "bg-emerald-500/10 text-emerald-600" :
+                                                                        version.status === "improvement_pending" ? "bg-primary/10 text-primary" :
+                                                                        version.status === "rejected" ? "bg-destructive/10 text-destructive" :
+                                                                        "bg-amber-500/10 text-amber-600"
+                                                                    )}
+                                                                >
+                                                                    {version.status.replace('_', ' ')}
+                                                                </Badge>
+                                                                {isCurrentLiveVersion && (
+                                                                    <Badge variant="outline" className="text-[10px] uppercase font-bold bg-primary/10 text-primary border-primary/20">
+                                                                        Current live
+                                                                    </Badge>
+                                                                )}
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    {new Date(version.createdAt).toLocaleString()}
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-sm font-semibold">{version.submittedBy || "Unknown contributor"}</div>
+                                                            <div className="text-xs text-muted-foreground">
+                                                                {version.trackName} • {version.artistName}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <Button variant="outline" size="sm" onClick={() => handleSelect(version)}>
+                                                                View
+                                                            </Button>
+                                                            {version.status === "approved" && !isCurrentLiveVersion && (
+                                                                <>
+                                                                    <Button variant="outline" size="sm" onClick={() => handleRestoreVersion(version._id, false)}>
+                                                                        Restore Lyrics
+                                                                    </Button>
+                                                                    <Button size="sm" onClick={() => handleRestoreVersion(version._id, true)}>
+                                                                        Restore With Metadata
+                                                                    </Button>
+                                                                </>
+                                                            )}
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="text-destructive hover:bg-destructive/10"
+                                                                onClick={() => handleDelete(version._id)}
+                                                            >
+                                                                Delete
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )})}
+                                        </div>
+                                    </ScrollArea>
                                 </TabsContent>
                             )}
 
@@ -976,13 +1191,37 @@ const AdminPage = () => {
                                     </Button>
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button variant="outline" className="border-destructive/20 text-destructive hover:bg-destructive/5" onClick={() => setIsRejecting(true)}>
-                                        Reject Submission
-                                    </Button>
-                                    <Button className="bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/20" onClick={() => handleStatus(selectedLyric._id, "approved")}>
-                                        <Check className="h-4 w-4 mr-2" />
-                                        Approve & Publish
-                                    </Button>
+                                    {selectedLyric?.status !== "approved" && (
+                                        <Button variant="outline" className="border-destructive/20 text-destructive hover:bg-destructive/5" onClick={() => setIsRejecting(true)}>
+                                            Reject Submission
+                                        </Button>
+                                    )}
+                                    {selectedLyric?.status !== "approved" && selectedLyric?.parentLyricId ? (
+                                        <>
+                                            <Button
+                                                variant="outline"
+                                                className="border-emerald-500/20 text-emerald-700 hover:bg-emerald-500/5 dark:text-emerald-300"
+                                                onClick={() => handleStatus(selectedLyric._id, "approved", { mergeMetadata: false })}
+                                            >
+                                                <Check className="h-4 w-4 mr-2" />
+                                                Approve Lyrics Update
+                                            </Button>
+                                            {metadataChanges.length > 0 && (
+                                                <Button
+                                                    className="bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/20"
+                                                    onClick={() => handleStatus(selectedLyric._id, "approved", { mergeMetadata: true })}
+                                                >
+                                                    <Check className="h-4 w-4 mr-2" />
+                                                    Approve Lyrics + Metadata
+                                                </Button>
+                                            )}
+                                        </>
+                                    ) : selectedLyric?.status !== "approved" ? (
+                                        <Button className="bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/20" onClick={() => handleStatus(selectedLyric._id, "approved", { mergeMetadata: false })}>
+                                            <Check className="h-4 w-4 mr-2" />
+                                            Approve Submission
+                                        </Button>
+                                    ) : null}
                                 </div>
                             </div>
                         )}

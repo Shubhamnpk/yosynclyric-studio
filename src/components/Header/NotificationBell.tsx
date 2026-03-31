@@ -93,7 +93,7 @@ export const NotificationBell = () => {
                                 <DropdownMenuItem 
                                     key={n._id} 
                                     className={cn(
-                                        "p-4 flex flex-col items-start gap-2 border-b border-muted/20 last:border-0 cursor-default focus:bg-primary/5",
+                                        "p-4 flex flex-col items-start gap-2 border-b border-muted/20 last:border-0 cursor-default focus:bg-primary/5 focus:text-foreground",
                                         !n.isRead && "bg-primary/5"
                                     )}
                                     onSelect={(e) => {

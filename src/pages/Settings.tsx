@@ -36,7 +36,7 @@ export default function SettingsPage() {
             <div className="max-w-3xl mx-auto space-y-6">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+                        <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
                             <ArrowLeft className="h-5 w-5" />
                         </Button>
                         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Settings</h1>
@@ -223,7 +223,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="text-center text-xs text-muted-foreground py-4">
-                    SyncLyric Studio v1.2.0 • Made with ❤️ by Shubham
+                    YoSyncLyric Studio v1.2.0 • Made with ❤️ by Shubham
                 </div>
             </div>
         </div>

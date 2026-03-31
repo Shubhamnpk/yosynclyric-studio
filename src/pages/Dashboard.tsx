@@ -203,7 +203,7 @@ const Dashboard = () => {
                                 <CardContent className="flex-1 pb-2">
                                     <div className="text-xs text-muted-foreground flex items-center gap-1">
                                         <span className="bg-muted px-1.5 py-0.5 rounded">{project.lines.length} lines</span>
-                                        <span>â€¢</span>
+                                        <span>•</span>
                                         <span>{project.language.toUpperCase()}</span>
                                     </div>
                                 </CardContent>
@@ -246,3 +246,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+

@@ -37,10 +37,56 @@ const fingerprintLyrics = (value: string) =>
     );
 
 const getRootLyricId = (lyric: LyricDoc): LyricId => lyric.parentLyricId ?? lyric._id;
+const isCanonicalLyric = (lyric: LyricDoc) => !lyric.parentLyricId;
 
 const getDurationDelta = (a?: number, b?: number) => {
     if (!a || !b) return Number.POSITIVE_INFINITY;
     return Math.abs(a - b);
+};
+
+const scoreSearchCandidate = (query: string, lyric: LyricDoc) => {
+    const normalizedQuery = normalizeText(query);
+    if (!normalizedQuery) return 0;
+
+    const tokens = normalizedQuery
+        .split(" ")
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 2);
+
+    const normalizedTrack = normalizeText(lyric.trackName);
+    const normalizedArtist = normalizeArtist(lyric.artistName);
+    const normalizedAlbum = normalizeText(lyric.albumName || "");
+    const normalizedCombined = `${normalizedTrack} ${normalizedArtist} ${normalizedAlbum}`.trim();
+
+    let score = 0;
+
+    if (normalizedTrack === normalizedQuery) score += 180;
+    if (normalizedArtist === normalizedQuery) score += 120;
+    if (normalizedCombined === normalizedQuery) score += 90;
+
+    if (normalizedTrack.startsWith(normalizedQuery)) score += 80;
+    else if (normalizedTrack.includes(normalizedQuery)) score += 52;
+
+    if (normalizedArtist.startsWith(normalizedQuery)) score += 48;
+    else if (normalizedArtist.includes(normalizedQuery)) score += 30;
+
+    if (normalizedAlbum.includes(normalizedQuery)) score += 20;
+    if (normalizedCombined.includes(normalizedQuery)) score += 24;
+
+    for (const token of tokens) {
+        if (normalizedTrack.startsWith(token)) score += 16;
+        else if (normalizedTrack.includes(token)) score += 10;
+
+        if (normalizedArtist.startsWith(token)) score += 12;
+        else if (normalizedArtist.includes(token)) score += 8;
+
+        if (normalizedAlbum.includes(token)) score += 4;
+    }
+
+    if (lyric.syncedLyrics?.trim()) score += 6;
+    if ((lyric.searchHistory || 0) > 0) score += Math.min(12, Math.floor((lyric.searchHistory || 0) / 10));
+
+    return score;
 };
 
 const scoreDuplicateCandidate = (args: {
@@ -284,6 +330,7 @@ export const search = query({
             )
             .filter((q) => q.eq(q.field("isApproved"), true))
             .collect();
+        results = results.filter(isCanonicalLyric);
 
         if (args.duration && results.length > 0) {
             return results.sort((a, b) =>
@@ -304,15 +351,16 @@ export const searchByText = query({
         const lyrics = await ctx.db.query("lyrics").collect();
 
         return lyrics
-            .filter((lyric: any) => lyric.isApproved)
-            .map((lyric: any) => {
-                const haystack = `${normalizeText(lyric.trackName)} ${normalizeArtist(lyric.artistName)}`;
-                const starts = haystack.startsWith(normalizedQuery) ? 20 : 0;
-                const includes = haystack.includes(normalizedQuery) ? 10 : 0;
-                return { lyric, score: starts + includes };
-            })
+            .filter((lyric: any) => lyric.isApproved && isCanonicalLyric(lyric))
+            .map((lyric: any) => ({ lyric, score: scoreSearchCandidate(args.query, lyric) }))
             .filter((item: any) => item.score > 0)
-            .sort((a: any, b: any) => b.score - a.score)
+            .sort(
+                (a: any, b: any) =>
+                    b.score - a.score ||
+                    (b.lyric.searchHistory || 0) - (a.lyric.searchHistory || 0) ||
+                    b.lyric.updatedAt - a.lyric.updatedAt
+            )
+            .slice(0, 25)
             .map((item: any) => item.lyric);
     },
 });
@@ -409,9 +457,12 @@ export const getStats = query({
             throw new Error(validation.error || "Unauthorized");
         }
         const all = await ctx.db.query("lyrics").collect();
+        const canonicalApproved = all.filter(l => l.status === "approved" && !l.parentLyricId);
+        const approvedRevisions = all.filter(l => l.status === "approved" && !!l.parentLyricId);
         return {
             total: all.length,
-            approved: all.filter(l => l.status === "approved").length,
+            approved: canonicalApproved.length,
+            approvedRevisions: approvedRevisions.length,
             pending: all.filter(l => l.status === "pending").length,
             improvements: all.filter(l => l.status === "improvement_pending").length,
             rejected: all.filter(l => l.status === "rejected").length,
@@ -426,6 +477,7 @@ export const updateStatus = mutation({
         id: v.id("lyrics"),
         status: v.string(),
         rejectionReason: v.optional(v.string()),
+        mergeMetadata: v.optional(v.boolean()),
         token: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
@@ -441,16 +493,21 @@ export const updateStatus = mutation({
         
         // Handle Improvement Merging
         if (isApproved && lyric.status === "improvement_pending" && lyric.parentLyricId) {
-            // Apply changes to the parent record
-            await ctx.db.patch(lyric.parentLyricId, {
-                trackName: lyric.trackName,
-                artistName: lyric.artistName,
+            const parentPatch: Partial<LyricDoc> = {
                 plainLyrics: lyric.plainLyrics,
                 syncedLyrics: lyric.syncedLyrics,
-                albumName: lyric.albumName || undefined,
-                duration: lyric.duration,
                 updatedAt: Date.now()
-            });
+            };
+
+            if (args.mergeMetadata) {
+                parentPatch.trackName = lyric.trackName;
+                parentPatch.artistName = lyric.artistName;
+                parentPatch.albumName = lyric.albumName || undefined;
+                parentPatch.duration = lyric.duration;
+            }
+
+            // Apply changes to the parent record
+            await ctx.db.patch(lyric.parentLyricId, parentPatch);
             // Mark the improvement record itself as approved/archived
             await ctx.db.patch(args.id, { 
                 status: "approved", 
@@ -489,6 +546,63 @@ export const updateStatus = mutation({
                 createdAt: Date.now(),
             });
         }
+    },
+});
+
+export const restoreVersion = mutation({
+    args: {
+        id: v.id("lyrics"),
+        token: v.optional(v.string()),
+        restoreMetadata: v.optional(v.boolean()),
+    },
+    handler: async (ctx, args) => {
+        const validation = await validateToken(ctx, args.token);
+        if (!validation.valid) {
+            throw new Error(validation.error || "Unauthorized");
+        }
+
+        const version = await ctx.db.get(args.id);
+        if (!version) throw new Error("Version not found");
+        if (!version.parentLyricId) {
+            throw new Error("Only improvement versions can be restored");
+        }
+
+        const parent = await ctx.db.get(version.parentLyricId);
+        if (!parent) throw new Error("Parent lyric not found");
+
+        await ctx.db.insert("lyrics", {
+            trackName: parent.trackName,
+            artistName: parent.artistName,
+            albumName: parent.albumName,
+            duration: parent.duration,
+            plainLyrics: parent.plainLyrics,
+            syncedLyrics: parent.syncedLyrics,
+            searchHistory: 0,
+            submittedBy: "Admin Restore Snapshot",
+            submittedById: validation.userId as LyricDoc["submittedById"],
+            status: "approved",
+            parentLyricId: parent._id,
+            isApproved: true,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+        });
+
+        const parentPatch: Partial<LyricDoc> = {
+            plainLyrics: version.plainLyrics,
+            syncedLyrics: version.syncedLyrics,
+            updatedAt: Date.now(),
+        };
+
+        if (args.restoreMetadata) {
+            parentPatch.trackName = version.trackName;
+            parentPatch.artistName = version.artistName;
+            parentPatch.albumName = version.albumName;
+            parentPatch.duration = version.duration;
+        }
+
+        await ctx.db.patch(parent._id, parentPatch);
+
+        return { success: true, parentId: parent._id };
     },
 });
 

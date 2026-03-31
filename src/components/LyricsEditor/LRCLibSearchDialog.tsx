@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -19,6 +19,8 @@ import { api } from '../../../convex/_generated/api';
 
 interface SearchResult extends LRCLibSearchResult {
     source: 'lrclib' | 'yosync';
+    relevanceScore?: number;
+    searchHistory?: number;
 }
 
 interface LRCLibSearchDialogProps {
@@ -28,12 +30,99 @@ interface LRCLibSearchDialogProps {
     initialQuery?: string;
 }
 
+const normalizeSearchText = (value: string) =>
+    value
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/['`"]/g, "")
+        .replace(/[^a-z0-9]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+const scoreSearchResult = (query: string, result: SearchResult) => {
+    const normalizedQuery = normalizeSearchText(query);
+    if (!normalizedQuery) return 0;
+
+    const tokens = normalizedQuery.split(" ").filter((token) => token.length >= 2);
+    const track = normalizeSearchText(result.trackName);
+    const artist = normalizeSearchText(result.artistName);
+    const album = normalizeSearchText(result.albumName || "");
+    const combined = `${track} ${artist} ${album}`.trim();
+
+    let score = 0;
+
+    if (track === normalizedQuery) score += 180;
+    if (artist === normalizedQuery) score += 120;
+    if (combined === normalizedQuery) score += 90;
+
+    if (track.startsWith(normalizedQuery)) score += 80;
+    else if (track.includes(normalizedQuery)) score += 48;
+
+    if (artist.startsWith(normalizedQuery)) score += 44;
+    else if (artist.includes(normalizedQuery)) score += 28;
+
+    if (album.includes(normalizedQuery)) score += 18;
+    if (combined.includes(normalizedQuery)) score += 24;
+
+    for (const token of tokens) {
+        if (track.startsWith(token)) score += 16;
+        else if (track.includes(token)) score += 10;
+
+        if (artist.startsWith(token)) score += 12;
+        else if (artist.includes(token)) score += 8;
+
+        if (album.includes(token)) score += 4;
+    }
+
+    if (result.syncedLyrics?.trim()) score += 6;
+    if (result.source === "yosync") score += 8;
+    if ((result.searchHistory || 0) > 0) score += Math.min(10, Math.floor((result.searchHistory || 0) / 10));
+
+    return score;
+};
+
+const dedupeAndRankResults = (query: string, incoming: SearchResult[]) => {
+    const grouped = new Map<string, SearchResult>();
+    const keyOf = (item: SearchResult) =>
+        `${normalizeSearchText(item.trackName)}::${normalizeSearchText(item.artistName)}::${Math.round(item.duration || 0)}`;
+
+    for (const item of incoming) {
+        const withScore = { ...item, relevanceScore: scoreSearchResult(query, item) };
+        const key = keyOf(withScore);
+        const existing = grouped.get(key);
+
+        if (!existing) {
+            grouped.set(key, withScore);
+            continue;
+        }
+
+        const existingScore = existing.relevanceScore || 0;
+        const nextScore = withScore.relevanceScore || 0;
+        const shouldReplace =
+            nextScore > existingScore ||
+            (nextScore === existingScore && withScore.source === "yosync" && existing.source !== "yosync");
+
+        if (shouldReplace) {
+            grouped.set(key, withScore);
+        }
+    }
+
+    return [...grouped.values()].sort((a, b) => {
+        const scoreDiff = (b.relevanceScore || 0) - (a.relevanceScore || 0);
+        if (scoreDiff !== 0) return scoreDiff;
+        if (a.source !== b.source) return a.source === "yosync" ? -1 : 1;
+        return (b.searchHistory || 0) - (a.searchHistory || 0);
+    });
+};
+
 export const LRCLibSearchDialog = ({ open, onOpenChange, onImport, initialQuery }: LRCLibSearchDialogProps) => {
     const convex = useConvex();
     const [query, setQuery] = useState(initialQuery || '');
     const [results, setResults] = useState<SearchResult[]>([]);
     const [loading, setLoading] = useState(false);
     const [hasAutoSearched, setHasAutoSearched] = useState(false);
+    const [sourceFilter, setSourceFilter] = useState<'all' | 'yosync' | 'lrclib'>('all');
 
     useEffect(() => {
         if (open && initialQuery && !hasAutoSearched) {
@@ -66,11 +155,12 @@ export const LRCLibSearchDialog = ({ open, onOpenChange, onImport, initialQuery 
                 instrumental: false,
                 plainLyrics: r.plainLyrics,
                 syncedLyrics: r.syncedLyrics || '',
+                searchHistory: (r as any).searchHistory || 0,
                 source: 'yosync'
             }));
 
-            // Combine and prioritize Yosync (Verified) results
-            setResults([...formattedYosync, ...formattedLrc]);
+            // Combine, dedupe and rank by relevance
+            setResults(dedupeAndRankResults(q, [...formattedYosync, ...formattedLrc]));
 
         } catch (error) {
             console.error('Search error:', error);
@@ -81,6 +171,16 @@ export const LRCLibSearchDialog = ({ open, onOpenChange, onImport, initialQuery 
     };
 
     const incrementSearch = useMutation(api.lyrics.incrementSearchCount);
+
+    const visibleResults = useMemo(() => {
+        if (sourceFilter === 'all') return results;
+        return results.filter((result) => result.source === sourceFilter);
+    }, [results, sourceFilter]);
+
+    const sourceCounts = useMemo(() => ({
+        yosync: results.filter((result) => result.source === 'yosync').length,
+        lrclib: results.filter((result) => result.source === 'lrclib').length,
+    }), [results]);
 
     const handleImport = async (lyrics: string, synced: boolean, source: string, id: any, metadata: { title: string, artist: string, album?: string, duration?: number }) => {
         if (source === 'yosync' && id) {
@@ -96,7 +196,7 @@ export const LRCLibSearchDialog = ({ open, onOpenChange, onImport, initialQuery 
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-2xl w-[95vw] h-[85vh] md:h-[80vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl bg-background/95 backdrop-blur-xl">
+            <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-2xl h-[85vh] md:h-[80vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl bg-background/95 backdrop-blur-xl">
                 <DialogHeader className="p-6 md:p-8 bg-gradient-to-br from-primary/20 via-primary/5 to-transparent border-b border-primary/10">
                     <DialogTitle className="flex items-center gap-3 text-2xl font-bold tracking-tight">
                         <div className="p-2 rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
@@ -127,9 +227,37 @@ export const LRCLibSearchDialog = ({ open, onOpenChange, onImport, initialQuery 
                             Search
                         </Button>
                     </div>
+                    {results.length > 0 && (
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <Button
+                                size="sm"
+                                variant={sourceFilter === 'all' ? 'default' : 'outline'}
+                                className="h-7 rounded-full px-3 text-[11px]"
+                                onClick={() => setSourceFilter('all')}
+                            >
+                                All ({results.length})
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant={sourceFilter === 'yosync' ? 'default' : 'outline'}
+                                className="h-7 rounded-full px-3 text-[11px]"
+                                onClick={() => setSourceFilter('yosync')}
+                            >
+                                Yosync ({sourceCounts.yosync})
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant={sourceFilter === 'lrclib' ? 'default' : 'outline'}
+                                className="h-7 rounded-full px-3 text-[11px]"
+                                onClick={() => setSourceFilter('lrclib')}
+                            >
+                                LRCLIB ({sourceCounts.lrclib})
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
-                <ScrollArea className="flex-1 px-5 md:px-6">
+                <ScrollArea className="min-w-0 flex-1 px-5 md:px-6">
                     <div className="space-y-4 pb-6">
                         {loading && results.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-5">
@@ -142,7 +270,7 @@ export const LRCLibSearchDialog = ({ open, onOpenChange, onImport, initialQuery 
                                     <p className="text-[10px] uppercase tracking-widest text-muted-foreground mt-1">Connecting to global servers</p>
                                 </div>
                             </div>
-                        ) : results.map((result) => {
+                        ) : visibleResults.map((result) => {
                             const mm = Math.floor(result.duration / 60);
                             const ss = Math.floor(result.duration % 60);
                             const timeStr = `${mm}:${ss.toString().padStart(2, '0')}`;
@@ -150,19 +278,19 @@ export const LRCLibSearchDialog = ({ open, onOpenChange, onImport, initialQuery 
 
                             return (
                                 <div key={result.id + result.source} className={cn(
-                                    "group relative flex flex-col gap-4 p-5 border rounded-2xl transition-all duration-300",
+                                    "group relative min-w-0 flex flex-col gap-4 p-5 border rounded-2xl transition-all duration-300",
                                     isYosync
                                         ? "bg-primary/5 border-primary/20 hover:bg-primary/10 hover:border-primary/40"
                                         : "bg-muted/5 border-muted-foreground/10 hover:bg-muted/20 hover:border-primary/20"
                                 )}>
                                     <div className="flex justify-between items-start gap-4">
                                         <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <h3 className="font-bold text-lg group-hover:text-primary transition-colors truncate leading-tight">
+                                            <div className="mb-1 flex min-w-0 items-start gap-2">
+                                                <h3 className="min-w-0 flex-1 whitespace-normal break-words [overflow-wrap:anywhere] font-bold text-lg group-hover:text-primary transition-colors leading-tight">
                                                     {result.trackName}
                                                 </h3>
                                                 {isYosync && (
-                                                    <Badge className="bg-primary text-primary-foreground text-[10px] h-5 px-1.5 font-bold shadow-sm">
+                                                    <Badge className="h-5 shrink-0 bg-primary px-1.5 text-[10px] font-bold text-primary-foreground shadow-sm">
                                                         <ShieldCheck className="h-3 w-3 mr-1" />
                                                         VERIFIED
                                                     </Badge>
@@ -188,11 +316,11 @@ export const LRCLibSearchDialog = ({ open, onOpenChange, onImport, initialQuery 
                                         </div>
                                     </div>
 
-                                    <div className="flex flex-row justify-end gap-3 mt-1">
+                                    <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:justify-end sm:gap-3">
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            className="text-xs h-9 px-4 font-bold hover:bg-primary/5 rounded-xl transition-all"
+                                            className="h-9 w-full rounded-xl px-4 text-xs font-bold text-foreground transition-all hover:bg-primary/10 hover:text-foreground sm:w-auto"
                                             onClick={() => handleImport(result.plainLyrics, false, result.source, result.id, { title: result.trackName, artist: result.artistName, album: result.albumName, duration: result.duration })}
                                             disabled={!result.plainLyrics}
                                         >
@@ -201,7 +329,7 @@ export const LRCLibSearchDialog = ({ open, onOpenChange, onImport, initialQuery 
                                         <Button
                                             size="sm"
                                             className={cn(
-                                                "text-xs h-9 px-6 font-bold rounded-xl transition-all",
+                                                "h-9 w-full rounded-xl px-6 text-xs font-bold transition-all sm:w-auto",
                                                 result.syncedLyrics ? "bg-primary shadow-lg shadow-primary/20" : "bg-muted text-muted-foreground"
                                             )}
                                             onClick={() => handleImport(result.syncedLyrics, true, result.source, result.id, { title: result.trackName, artist: result.artistName, album: result.albumName, duration: result.duration })}
@@ -215,13 +343,17 @@ export const LRCLibSearchDialog = ({ open, onOpenChange, onImport, initialQuery 
                             );
                         })}
 
-                        {results.length === 0 && !loading && query && (
+                        {visibleResults.length === 0 && !loading && query && (
                             <div className="flex flex-col items-center justify-center py-24 text-muted-foreground transition-all animate-in fade-in zoom-in-95">
                                 <div className="w-20 h-20 rounded-full bg-muted/20 flex items-center justify-center mb-6">
                                     <Search className="h-10 w-10 text-muted-foreground/30" />
                                 </div>
                                 <p className="text-base font-bold text-foreground/70">No matching lyrics found</p>
-                                <p className="text-xs mt-1 text-muted-foreground max-w-[280px] text-center">We couldn't find "{query}" in any of our databases. Try a different search term.</p>
+                                <p className="text-xs mt-1 text-muted-foreground max-w-[320px] text-center">
+                                    {sourceFilter === 'all'
+                                        ? `We couldn't find "${query}" in any of our databases. Try a different search term.`
+                                        : `No ${sourceFilter.toUpperCase()} results matched "${query}". Try the "All" filter.`}
+                                </p>
                             </div>
                         )}
                         {!query && !loading && (

@@ -131,6 +131,15 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
         }
     }, [open, project.title, project.artist, project.album, project.duration, audioDuration]);
 
+    useEffect(() => {
+        if (!publishToYosync) {
+            setIsDuplicate(false);
+            setOriginalId(null);
+            setParentLyricId(null);
+            setShowComparison(false);
+        }
+    }, [publishToYosync]);
+
     const hasContent = project.lines.length > 0 && project.lines.some(l => l.text.trim().length > 0);
     const hasTimestamps = project.lines.some(l => l.startTime !== null);
 
@@ -153,6 +162,16 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
     }).join('\n');
     const existingLines = parentLyric?.syncedLyrics?.split('\n') ?? [];
     const improvedLines = syncedLyrics.split('\n');
+    const hasImprovementChanges = parentLyric
+        ? (
+            parentLyric.trackName !== trackName ||
+            parentLyric.artistName !== artistName ||
+            (parentLyric.albumName || '') !== albumName ||
+            parentLyric.duration !== duration ||
+            parentLyric.plainLyrics !== plainLyrics ||
+            parentLyric.syncedLyrics !== syncedLyrics
+        )
+        : true;
     const comparisonRows = Array.from(
         { length: Math.max(existingLines.length, improvedLines.length) },
         (_, index) => {
@@ -169,7 +188,7 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
 
     const duplicateSuggestions = useQuery(
         api.lyrics.findPossibleDuplicates,
-        open && trackName.trim() && artistName.trim()
+        open && publishToYosync && trackName.trim() && artistName.trim()
             ? {
                 trackName,
                 artistName,
@@ -195,6 +214,11 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
 
         if (!publishToLrcLib && !publishToYosync) {
             toast.error('Please select at least one destination to publish');
+            return;
+        }
+
+        if (publishToYosync && parentLyricId && parentLyric && !hasImprovementChanges) {
+            toast.error('No changes detected. Update the lyrics or metadata before submitting an improvement.');
             return;
         }
 
@@ -301,7 +325,7 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                 <div className="flex-1 overflow-y-auto">
                     <div className="p-6 md:p-8 space-y-6">
                     {/* Status Alerts */}
-                    {isDuplicate ? (
+                    {publishToYosync && isDuplicate ? (
                         <div className="flex flex-col gap-3 p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 animate-in fade-in slide-in-from-top-2">
                             <div className="flex items-start gap-3">
                                 <Search className="h-5 w-5 mt-0.5 shrink-0" />
@@ -326,7 +350,7 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                                 Review as Improvement
                             </Button>
                         </div>
-                    ) : !parentLyricId && duplicateSuggestions && duplicateSuggestions.length > 0 ? (
+                    ) : publishToYosync && !parentLyricId && duplicateSuggestions && duplicateSuggestions.length > 0 ? (
                         <div className="space-y-4 p-4 rounded-2xl bg-primary/5 border border-primary/15 animate-in fade-in slide-in-from-top-2">
                             <div className="flex items-start gap-3">
                                 <LayoutGrid className="h-5 w-5 mt-0.5 shrink-0 text-primary" />
@@ -396,7 +420,7 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                                 </Button>
                             )}
                         </div>
-                    ) : parentLyricId ? (
+                    ) : publishToYosync && parentLyricId ? (
                         <div className="space-y-4 animate-in fade-in zoom-in-95">
                             <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/10 border border-primary/20 text-xs text-primary">
                                 <Sparkles className="h-4 w-4 shrink-0" />
@@ -418,6 +442,14 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                                     </Button>
                                 </div>
                             </div>
+                            {parentLyric && !hasImprovementChanges && (
+                                <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-xs text-amber-700 dark:text-amber-300">
+                                    <Clock className="h-4 w-4 shrink-0" />
+                                    <span className="font-medium">
+                                        No differences found between the existing version and your submission. Make a lyrics or metadata change before submitting an improvement.
+                                    </span>
+                                </div>
+                            )}
                             
                             {showComparison && parentLyric && (
                                 <div className="grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-muted bg-muted animate-in slide-in-from-top-2 md:grid-cols-2">
@@ -616,7 +648,12 @@ export const PublishDialog = ({ open, onOpenChange, project, audioDuration }: Pu
                     </Button>
                     <Button
                         onClick={handlePublish}
-                        disabled={publishing || !isFormValid || (!publishToLrcLib && !publishToYosync)}
+                        disabled={
+                            publishing ||
+                            !isFormValid ||
+                            (!publishToLrcLib && !publishToYosync) ||
+                            (publishToYosync && !!parentLyricId && !!parentLyric && !hasImprovementChanges)
+                        }
                         className="w-full sm:flex-1 font-bold shadow-xl shadow-primary/20 h-11 rounded-xl group overflow-hidden relative"
                     >
                         <div className="absolute inset-0 bg-gradient-to-r from-primary-foreground/0 via-primary-foreground/10 to-primary-foreground/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
