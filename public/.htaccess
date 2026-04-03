@@ -42,11 +42,15 @@
   ExpiresByType application/json "access plus 0 seconds"
   ExpiresByType application/ld+json "access plus 0 seconds"
   ExpiresByType image/x-icon "access plus 1 year"
+  ExpiresByType image/vnd.microsoft.icon "access plus 1 year"
 </IfModule>
 
 # Force HTTPS
 <IfModule mod_rewrite.c>
   RewriteEngine On
+  # Force a first-party favicon for all routes/resources.
+  RewriteRule ^favicon\.ico$ /favicon.ico [L]
+
   RewriteCond %{HTTPS} off
   RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
   
@@ -73,4 +77,6 @@ Options -Indexes
 <IfModule mod_mime.c>
   AddType application/manifest+json .webmanifest
   AddType application/ld+json .jsonld
+  AddType image/x-icon .ico
+  AddType image/vnd.microsoft.icon .ico
 </IfModule>

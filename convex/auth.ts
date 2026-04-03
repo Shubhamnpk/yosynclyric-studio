@@ -63,6 +63,28 @@ const verifyPassword = async (password: string, saltB64: string, expectedHash: s
     return computed === expectedHash;
 };
 
+const validateSessionToken = async (
+    ctx: any,
+    token: string
+): Promise<{ valid: boolean; session?: any; user?: any; error?: string }> => {
+    const session = await ctx.db
+        .query("sessions")
+        .withIndex("by_token", (q: any) => q.eq("token", token))
+        .unique();
+
+    if (!session) return { valid: false, error: "Invalid session" };
+
+    if (Date.now() > session.expiresAt) {
+        await ctx.db.delete(session._id);
+        return { valid: false, error: "Session expired" };
+    }
+
+    const user = await ctx.db.get(session.userId);
+    if (!user) return { valid: false, error: "User not found" };
+
+    return { valid: true, session, user };
+};
+
 // Generate a unique username based on a base name
 const generateUniqueUsername = async (ctx: any, baseName: string): Promise<string> => {
     // Normalize base name: lowercase, alphanumeric and underscores only
@@ -159,6 +181,53 @@ export const ensureGuestUser = mutation({
             createdAt: Date.now(),
         });
         return userId;
+    },
+});
+
+// Create or reuse a guest user and issue a session token
+export const ensureGuestSession = mutation({
+    args: { name: v.string() },
+    handler: async (ctx, args) => {
+        const existingUser = await ctx.db
+            .query("users")
+            .withIndex("by_name", (q: any) => q.eq("name", args.name))
+            .filter((q) => q.eq(q.field("role"), "guest"))
+            .unique();
+
+        let userId = existingUser?._id as Id<"users"> | undefined;
+        if (!userId) {
+            const username = await generateUniqueUsername(ctx, args.name || "guest");
+            userId = await ctx.db.insert("users", {
+                name: args.name,
+                username,
+                role: "guest",
+                createdAt: Date.now(),
+            });
+        }
+
+        const token = generateToken();
+        const expiresAt = Date.now() + SESSION_DURATION_MS;
+        await ctx.db.insert("sessions", {
+            token,
+            userId,
+            createdAt: Date.now(),
+            expiresAt,
+        });
+
+        const user = await ctx.db.get(userId);
+        return {
+            success: true,
+            token,
+            user: user
+                ? {
+                      _id: user._id,
+                      email: user.email || "",
+                      name: user.name,
+                      username: user.username,
+                      role: user.role as UserRole,
+                  }
+                : null,
+        };
     },
 });
 
@@ -309,12 +378,20 @@ export const logout = mutation({
 // Update user profile (name and email)
 export const updateProfile = mutation({
     args: { 
+        token: v.string(),
         userId: v.id("users"), 
         name: v.optional(v.string()), 
         email: v.optional(v.string()),
         username: v.optional(v.string())
     },
     handler: async (ctx, args) => {
+        const auth = await validateSessionToken(ctx, args.token);
+        if (!auth.valid) return { success: false, error: auth.error || "Unauthorized" };
+
+        const isOwner = String(auth.session!.userId) === String(args.userId);
+        const isAdmin = auth.user?.role === "admin";
+        if (!isOwner && !isAdmin) return { success: false, error: "Forbidden" };
+
         const updates: any = {};
         if (args.name !== undefined) updates.name = args.name;
         if (args.email !== undefined) {
@@ -349,8 +426,15 @@ export const updateProfile = mutation({
 
 // Update user password
 export const updatePassword = mutation({
-    args: { userId: v.id("users"), currentPassword: v.string(), newPassword: v.string() },
+    args: { token: v.string(), userId: v.id("users"), currentPassword: v.string(), newPassword: v.string() },
     handler: async (ctx, args) => {
+        const auth = await validateSessionToken(ctx, args.token);
+        if (!auth.valid) return { success: false, error: auth.error || "Unauthorized" };
+
+        const isOwner = String(auth.session!.userId) === String(args.userId);
+        const isAdmin = auth.user?.role === "admin";
+        if (!isOwner && !isAdmin) return { success: false, error: "Forbidden" };
+
         const user = await ctx.db.get(args.userId);
         if (!user || !user.passwordHash || !user.passwordSalt) return { success: false, error: "User not found or not an account holder" };
 
@@ -370,8 +454,15 @@ export const updatePassword = mutation({
 
 // Upgrade guest to full account
 export const upgradeToAccount = mutation({
-    args: { userId: v.id("users"), email: v.string(), password: v.string() },
+    args: { token: v.string(), userId: v.id("users"), email: v.string(), password: v.string() },
     handler: async (ctx, args) => {
+        const auth = await validateSessionToken(ctx, args.token);
+        if (!auth.valid) return { success: false, error: auth.error || "Unauthorized" };
+
+        const isOwner = String(auth.session!.userId) === String(args.userId);
+        const isAdmin = auth.user?.role === "admin";
+        if (!isOwner && !isAdmin) return { success: false, error: "Forbidden" };
+
         const user = await ctx.db.get(args.userId);
         if (!user) return { success: false, error: "Profile not found" };
         if (user.role !== "guest") return { success: false, error: "Only guest profiles can be upgraded" };

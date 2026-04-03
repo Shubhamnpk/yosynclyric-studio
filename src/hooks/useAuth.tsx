@@ -49,26 +49,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Login mutation
   const loginMutation = useMutation(api.auth.login);
+  const ensureGuestSessionMutation = useMutation(api.auth.ensureGuestSession);
   
   // Logout mutation
   const logoutMutation = useMutation(api.auth.logout);
 
   // Initialize from localStorage on mount
   useEffect(() => {
-    const savedToken = localStorage.getItem(TOKEN_KEY);
-    if (savedToken) {
-      setToken(savedToken);
-    }
+    const bootstrapAuth = async () => {
+      const savedToken = localStorage.getItem(TOKEN_KEY);
+      let savedGuestName = localStorage.getItem(GUEST_ID_KEY);
+      if (!savedGuestName) {
+        savedGuestName = generateGuestName();
+        localStorage.setItem(GUEST_ID_KEY, savedGuestName);
+      }
+      setGuestName(savedGuestName);
 
-    let savedGuestName = localStorage.getItem(GUEST_ID_KEY);
-    if (!savedGuestName) {
-      savedGuestName = generateGuestName();
-      localStorage.setItem(GUEST_ID_KEY, savedGuestName);
-    }
-    setGuestName(savedGuestName);
+      if (savedToken) {
+        setToken(savedToken);
+        setIsLoading(false);
+        return;
+      }
 
-    setIsLoading(false);
-  }, []);
+      try {
+        // Guests also get a server-side session token so sensitive guest actions
+        // can be authorized safely (e.g. profile upgrade, notification updates).
+        const guestSession = await ensureGuestSessionMutation({ name: savedGuestName });
+        if (guestSession?.success && guestSession.token) {
+          setToken(guestSession.token);
+          localStorage.setItem(TOKEN_KEY, guestSession.token);
+        }
+      } catch (error) {
+        console.error("Guest session bootstrap failed:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void bootstrapAuth();
+  }, [ensureGuestSessionMutation]);
 
   // Update user when token or currentUser changes
   useEffect(() => {
@@ -145,7 +164,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     token,
     isLoading: isLoading || isUserLoading,
-    isAuthenticated: !!user && !!token,
+    // Guests have a token for secure server-side ownership checks,
+    // but should still be treated as unauthenticated for account-only routes.
+    isAuthenticated: !!user && !!token && user.role !== "guest",
     submissionUsername,
     login,
     logout,

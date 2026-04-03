@@ -153,6 +153,67 @@ const scoreDuplicateCandidate = (args: {
     };
 };
 
+type DuplicateCandidate = {
+    lyric: LyricDoc;
+    score: number;
+    isStrongDuplicate: boolean;
+    matchReasons: string[];
+    durationDelta: number | null;
+    trackExact: boolean;
+    artistExact: boolean;
+    lyricsExact: boolean;
+};
+
+const NON_REJECTED_STATUSES = ["approved", "pending", "improvement_pending"] as const;
+
+const fetchDuplicateCandidatePool = async (
+    ctx: any,
+    args: {
+        trackName: string;
+        artistName: string;
+    }
+): Promise<LyricDoc[]> => {
+    const candidates = new Map<string, LyricDoc>();
+    const addBatch = (batch: LyricDoc[]) => {
+        for (const lyric of batch) {
+            if (lyric.status === "rejected") continue;
+            candidates.set(String(lyric._id), lyric);
+        }
+    };
+
+    const [exactTrackArtist, artistMatches] = await Promise.all([
+        ctx.db
+            .query("lyrics")
+            .withIndex("by_track_artist", (q: any) =>
+                q.eq("trackName", args.trackName).eq("artistName", args.artistName)
+            )
+            .collect(),
+        ctx.db
+            .query("lyrics")
+            .withIndex("by_artist", (q: any) => q.eq("artistName", args.artistName))
+            .order("desc")
+            .take(180),
+    ]);
+    addBatch(exactTrackArtist);
+    addBatch(artistMatches);
+
+    // Search-index fallback for track title similarity across non-rejected statuses
+    // (helps catch near-duplicates where artist/title strings differ slightly).
+    const searchBatches = await Promise.all(
+        NON_REJECTED_STATUSES.map((status) =>
+            ctx.db
+                .query("lyrics")
+                .withSearchIndex("search_lyrics", (q: any) =>
+                    q.search("trackName", args.trackName).eq("status", status)
+                )
+                .take(100)
+        )
+    );
+    for (const batch of searchBatches) addBatch(batch);
+
+    return [...candidates.values()];
+};
+
 const findDuplicateCandidates = async (ctx: any, args: {
     trackName: string;
     artistName: string;
@@ -160,20 +221,19 @@ const findDuplicateCandidates = async (ctx: any, args: {
     syncedLyrics?: string;
     plainLyrics?: string;
 }) => {
-    const lyrics = await ctx.db.query("lyrics").collect();
-    const deduped = new Map<string, any>();
+    const lyrics = await fetchDuplicateCandidatePool(ctx, args);
+    const deduped = new Map<string, DuplicateCandidate>();
 
     lyrics
-        .filter((lyric: LyricDoc) => lyric.status !== "rejected")
-        .map((lyric: LyricDoc) => {
+        .map((lyric: LyricDoc): DuplicateCandidate => {
             const match = scoreDuplicateCandidate(args, lyric);
             return {
                 lyric,
                 ...match,
             };
         })
-        .filter((candidate: any) => candidate.score >= 45)
-        .forEach((candidate: any) => {
+        .filter((candidate) => candidate.score >= 45)
+        .forEach((candidate) => {
             const rootId = String(getRootLyricId(candidate.lyric));
             const existing = deduped.get(rootId);
             if (!existing || candidate.score > existing.score) {
@@ -182,37 +242,72 @@ const findDuplicateCandidates = async (ctx: any, args: {
         });
 
     return [...deduped.values()].sort(
-        (a: any, b: any) => b.score - a.score || Number(a.durationDelta ?? 9999) - Number(b.durationDelta ?? 9999)
+        (a, b) => b.score - a.score || Number(a.durationDelta ?? 9999) - Number(b.durationDelta ?? 9999)
     );
 };
 
 // ============ NOTIFICATIONS ============
 
 export const getUserNotifications = query({
-    args: { userId: v.optional(v.id("users")) },
+    args: { token: v.string() },
     handler: async (ctx, args) => {
-        if (!args.userId) return [];
+        const session = await ctx.db
+            .query("sessions")
+            .withIndex("by_token", (q: any) => q.eq("token", args.token))
+            .unique();
+
+        if (!session) return [];
+        if (Date.now() > session.expiresAt) return [];
+
         return await ctx.db
             .query("notifications")
-            .withIndex("by_user_id", (q) => q.eq("userId", args.userId!))
+            .withIndex("by_user_id", (q) => q.eq("userId", session.userId))
             .order("desc")
             .collect();
     },
 });
 
 export const markRead = mutation({
-    args: { id: v.id("notifications") },
+    args: { token: v.string(), id: v.id("notifications") },
     handler: async (ctx, args) => {
+        const session = await ctx.db
+            .query("sessions")
+            .withIndex("by_token", (q: any) => q.eq("token", args.token))
+            .unique();
+
+        if (!session) throw new Error("Unauthorized");
+        if (Date.now() > session.expiresAt) {
+            await ctx.db.delete(session._id);
+            throw new Error("Session expired");
+        }
+
+        const notification = await ctx.db.get(args.id);
+        if (!notification) throw new Error("Notification not found");
+        if (String(notification.userId) !== String(session.userId)) {
+            throw new Error("Forbidden");
+        }
+
         await ctx.db.patch(args.id, { isRead: true });
     },
 });
 
 export const markAllRead = mutation({
-    args: { userId: v.id("users") },
+    args: { token: v.string() },
     handler: async (ctx, args) => {
+        const session = await ctx.db
+            .query("sessions")
+            .withIndex("by_token", (q: any) => q.eq("token", args.token))
+            .unique();
+
+        if (!session) throw new Error("Unauthorized");
+        if (Date.now() > session.expiresAt) {
+            await ctx.db.delete(session._id);
+            throw new Error("Session expired");
+        }
+
         const unread = await ctx.db
             .query("notifications")
-            .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
+            .withIndex("by_user_id", (q) => q.eq("userId", session.userId))
             .filter((q) => q.eq(q.field("isRead"), false))
             .collect();
 
@@ -348,20 +443,36 @@ export const searchByText = query({
     handler: async (ctx, args) => {
         const normalizedQuery = normalizeText(args.query);
         if (!normalizedQuery) return [];
-        const lyrics = await ctx.db.query("lyrics").collect();
 
-        return lyrics
-            .filter((lyric: any) => lyric.isApproved && isCanonicalLyric(lyric))
-            .map((lyric: any) => ({ lyric, score: scoreSearchCandidate(args.query, lyric) }))
-            .filter((item: any) => item.score > 0)
+        // Primary path: use Convex search index to narrow candidate set.
+        // This avoids full collection scans for typical queries.
+        const indexedCandidates = await ctx.db
+            .query("lyrics")
+            .withSearchIndex("search_lyrics", (q) =>
+                q.search("trackName", args.query).eq("status", "approved").eq("isApproved", true)
+            )
+            .take(120);
+
+        let candidatePool = indexedCandidates.filter(isCanonicalLyric);
+
+        // Fallback for broad/edge queries: if indexed results are sparse,
+        // fetch approved canonical entries for scoring to maintain relevance.
+        if (candidatePool.length < 8) {
+            const allLyrics = await ctx.db.query("lyrics").collect();
+            candidatePool = allLyrics.filter((lyric) => lyric.isApproved && isCanonicalLyric(lyric));
+        }
+
+        return candidatePool
+            .map((lyric) => ({ lyric, score: scoreSearchCandidate(args.query, lyric) }))
+            .filter((item) => item.score > 0)
             .sort(
-                (a: any, b: any) =>
+                (a, b) =>
                     b.score - a.score ||
                     (b.lyric.searchHistory || 0) - (a.lyric.searchHistory || 0) ||
-                    b.lyric.updatedAt - a.lyric.updatedAt
+                    (b.lyric.updatedAt || b.lyric.createdAt) - (a.lyric.updatedAt || a.lyric.createdAt)
             )
             .slice(0, 25)
-            .map((item: any) => item.lyric);
+            .map((item) => item.lyric);
     },
 });
 

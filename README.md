@@ -16,7 +16,7 @@ A modern, web-based application for creating and editing synchronized lyrics (ka
 
 ### Professional Tools
 - **High-quality Video (MP4) Rendering** - Export synchronized lyrics as video with multiple resolutions
-- **ID3 Metadata Tagging** - Complete metadata management with cover art support
+- **ID3 Metadata Tagging (Feature-flagged)** - Metadata editor is present in code and can be enabled via feature config
 - **Multi-format Export** - LRC, SRT, VTT, and TXT formats supported
 - **LRC File Import** - Import existing synchronized lyrics
 
@@ -24,7 +24,7 @@ A modern, web-based application for creating and editing synchronized lyrics (ka
 - **Modern UI/UX** - Clean, intuitive interface built with shadcn/ui and Tailwind CSS
 - **Fully Responsive Design** - Optimized for mobile, tablet, and desktop screens
 - **Dark/Light Theme** - System preference detection with manual override
-- **Real-time Collaboration** - Auto-save and backup functionality
+- **Local Auto-save + Manual Backups** - Browser-based project persistence with backup snapshots
 - **Keyboard Shortcuts** - Efficient workflow with undo/redo support
 
 ## 🛠️ Tech Stack
@@ -34,8 +34,8 @@ A modern, web-based application for creating and editing synchronized lyrics (ka
 - **Styling**: Tailwind CSS + shadcn/ui components
 - **State Management**: React Query (TanStack Query)
 - **Audio Processing**: Web Audio API with waveform visualization
-- **Video Rendering**: HTML5 Canvas with FFmpeg.js
-- **Storage**: Encrypted local storage with backup system
+- **Video Rendering**: HTML5 Canvas + MediaRecorder
+- **Storage**: Browser local storage with backup system
 - **Database**: [Convex](https://www.convex.dev/) for community-sourced, verified lyrics
 - **Public API**: Real-time HTTP endpoints for lyrics discovery
 - **Responsiveness**: Mobile-first architecture using Tailwind CSS breakpoints
@@ -97,6 +97,11 @@ A modern, web-based application for creating and editing synchronized lyrics (ka
 - **Publish to Yosync**: Share your verified synced lyrics with the community
 - **Universal Search**: Search lyrics across Yosync Database and LRCLIB
 - **Admin Review**: Community submissions are reviewed for quality and accuracy
+
+## Feature Flags
+
+- `src/config/features.json` controls staged features.
+- Current default: `metadataEditor.enabled: false` (coming soon UI is shown until enabled).
 
 ## 🌐 Public API
 
@@ -175,7 +180,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Built with [shadcn/ui](https://ui.shadcn.com/) for beautiful, accessible components
 - Powered by [Vite](https://vitejs.dev/) for fast development and builds
 - Audio processing powered by the Web Audio API
-- Video rendering with HTML5 Canvas and FFmpeg.js
+- Video rendering with HTML5 Canvas and MediaRecorder
 
 ## 📞 Support
 

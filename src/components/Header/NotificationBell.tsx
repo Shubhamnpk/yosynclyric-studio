@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
 export const NotificationBell = () => {
-    const { user, submissionUsername } = useAuth();
+    const { user, submissionUsername, token } = useAuth();
     
     // For non-logged in users, we check if a guest user record exists for them in the DB
     const guestUserId = useQuery(api.auth.getGuestUserByName, 
@@ -28,7 +28,7 @@ export const NotificationBell = () => {
     
     // Fetch notifications only if we have a valid user ID (logged in or persistent guest)
     const notifications = useQuery(api.lyrics.getUserNotifications, 
-        activeUserId ? { userId: activeUserId } : "skip"
+        token ? { token } : "skip"
     );
     
     const markRead = useMutation(api.lyrics.markRead);
@@ -37,8 +37,8 @@ export const NotificationBell = () => {
     const unreadCount = notifications?.filter(n => !n.isRead).length || 0;
 
     const handleMarkAllRead = async () => {
-        if (activeUserId) {
-            await markAllRead({ userId: activeUserId as any });
+        if (activeUserId && token) {
+            await markAllRead({ token });
         }
     };
 
@@ -98,7 +98,7 @@ export const NotificationBell = () => {
                                     )}
                                     onSelect={(e) => {
                                         e.preventDefault();
-                                        if (!n.isRead) markRead({ id: n._id });
+                                        if (!n.isRead && token) markRead({ token, id: n._id });
                                     }}
                                 >
                                     <div className="flex items-start gap-3 w-full">
