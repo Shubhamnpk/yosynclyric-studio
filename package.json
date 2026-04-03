@@ -51,7 +51,7 @@
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.462.0",
-    "music-metadata-browser": "^2.5.11",
+    "music-metadata": "^11.12.3",
     "next-themes": "^0.3.0",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
@@ -89,5 +89,23 @@
     "typescript-eslint": "^8.38.0",
     "vite": "^7.3.1",
     "vitest": "^3.2.4"
+  },
+  "pnpm": {
+    "overrides": {
+      "eslint>ajv": "6.14.0",
+      "eslint>minimatch": "3.1.4",
+      "flat-cache>flatted": "3.4.2",
+      "@typescript-eslint/typescript-estree>minimatch": "9.0.7",
+      "minimatch@3.1.4>brace-expansion": "1.1.13",
+      "minimatch@9.0.7>brace-expansion": "2.0.3",
+      "anymatch>picomatch": "2.3.2",
+      "micromatch>picomatch": "2.3.2",
+      "readdirp>picomatch": "2.3.2",
+      "tinyglobby>picomatch": "4.0.4",
+      "vite>picomatch": "4.0.4",
+      "vitest>picomatch": "4.0.4",
+      "vite>rollup": "4.59.0",
+      "@tootallnate/once": "3.0.1"
+    }
   }
 }

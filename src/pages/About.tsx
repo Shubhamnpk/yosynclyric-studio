@@ -130,7 +130,7 @@ const AboutPage = () => {
                             { icon: Palette, label: "Tailwind CSS", desc: "Styling" },
                             { icon: Music, label: "Web Audio API", desc: "Audio Processing" },
                             { icon: Video, label: "HTML5 Canvas", desc: "Video Rendering" },
-                            { icon: FileText, label: "FFmpeg.js", desc: "Video Encoding" },
+                            { icon: FileText, label: "MediaRecorder", desc: "Video Recording" },
                             { icon: Users, label: "shadcn/ui", desc: "Component Library" },
                             { icon: Globe, label: "Vite", desc: "Build Tool" }
                         ].map((tech, idx) => (

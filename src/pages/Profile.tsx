@@ -26,7 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 const ProfilePage = () => {
-    const { user, submissionUsername, logout } = useAuth();
+    const { user, submissionUsername, logout, token } = useAuth();
     const navigate = useNavigate();
     
     // Fetch guest profile if not logged in but has a persistent guest record
@@ -67,6 +67,7 @@ const ProfilePage = () => {
         setIsSaving(true);
         try {
             const result = await updateProfileMutation({
+                token: token || "",
                 userId: activeUser._id as any,
                 name: newName,
                 email: user ? newEmail : undefined,
@@ -94,6 +95,7 @@ const ProfilePage = () => {
         setIsSaving(true);
         try {
             const result = await upgradeMutation({
+                token: token || "",
                 userId: activeUser._id as any,
                 email: upgradeEmail,
                 password: upgradePassword
@@ -117,6 +119,7 @@ const ProfilePage = () => {
         setIsSaving(true);
         try {
             const result = await updatePasswordMutation({
+                token: token || "",
                 userId: user._id as any,
                 currentPassword,
                 newPassword

@@ -14,14 +14,18 @@ const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAlreadyLoggedIn, setIsAlreadyLoggedIn] = useState(false);
-  const { login, isAuthenticated, user } = useAuth();
+  const { login, isAuthenticated, user, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   // Get the redirect path from location state, or default to dashboard
   const from = (location.state as any)?.from?.pathname || "/dashboard";
+  const hasLegitGuestSession = !!user && user.role === "guest";
 
   useEffect(() => {
+    if (isLoading) return;
+
+    // Signed-in members/admins go back to their intended destination.
     if (isAuthenticated) {
       setIsAlreadyLoggedIn(true);
       const timer = setTimeout(() => {
@@ -29,7 +33,16 @@ const LoginPage = () => {
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, navigate, from]);
+
+    // Guest users are legitimate sessions and should not stay on login.
+    if (hasLegitGuestSession) {
+      setIsAlreadyLoggedIn(true);
+      const timer = setTimeout(() => {
+        navigate("/dashboard", { replace: true });
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated, hasLegitGuestSession, isLoading, navigate, from]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

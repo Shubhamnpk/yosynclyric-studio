@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { LyricLine, SectionType, LyricsProject } from '@/types/lyrics';
-import * as mmb from 'music-metadata-browser';
+import { parseBlob } from 'music-metadata';
 import { parseLRC } from '@/utils/parseLRC';
 import { saveProject } from '@/utils/projectStorage';
 
@@ -209,7 +209,7 @@ export const useLyricsEditor = (initialProject: LyricsProject) => {
 
     // Auto extract metadata if currently "Untitled" or empty
     try {
-      const metadata = await mmb.parseBlob(file);
+      const metadata = await parseBlob(file);
       const { title, artist, album, year, genre, picture } = metadata.common;
       const { duration } = metadata.format;
 

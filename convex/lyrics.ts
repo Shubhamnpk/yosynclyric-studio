@@ -1,34 +1,313 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
 // Last update trigger: 2026-03-12T03:30:00Z
+
+type LyricDoc = Doc<"lyrics">;
+type LyricId = Id<"lyrics">;
+
+const normalizeText = (value: string) =>
+    value
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/['’`"]/g, "")
+        .replace(/\([^)]*\)|\[[^\]]*\]/g, " ")
+        .replace(/\b(feat|ft|featuring)\.?\b/g, " ")
+        .replace(/&/g, " and ")
+        .replace(/[^a-z0-9]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+const normalizeArtist = (value: string) => {
+    const normalized = normalizeText(value);
+    const segments = normalized
+        .split(/\b(?:and|x|with|vs)\b|,/) 
+        .map((part) => part.trim())
+        .filter(Boolean);
+
+    return [...new Set(segments)].sort().join(" | ");
+};
+
+const fingerprintLyrics = (value: string) =>
+    normalizeText(
+        value
+            .replace(/\[\d{2,}:\d{2}(?:\.\d{1,3})?\]/g, " ")
+            .replace(/\r?\n/g, " ")
+    );
+
+const getRootLyricId = (lyric: LyricDoc): LyricId => lyric.parentLyricId ?? lyric._id;
+const isCanonicalLyric = (lyric: LyricDoc) => !lyric.parentLyricId;
+
+const getDurationDelta = (a?: number, b?: number) => {
+    if (!a || !b) return Number.POSITIVE_INFINITY;
+    return Math.abs(a - b);
+};
+
+const scoreSearchCandidate = (query: string, lyric: LyricDoc) => {
+    const normalizedQuery = normalizeText(query);
+    if (!normalizedQuery) return 0;
+
+    const tokens = normalizedQuery
+        .split(" ")
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 2);
+
+    const normalizedTrack = normalizeText(lyric.trackName);
+    const normalizedArtist = normalizeArtist(lyric.artistName);
+    const normalizedAlbum = normalizeText(lyric.albumName || "");
+    const normalizedCombined = `${normalizedTrack} ${normalizedArtist} ${normalizedAlbum}`.trim();
+
+    let score = 0;
+
+    if (normalizedTrack === normalizedQuery) score += 180;
+    if (normalizedArtist === normalizedQuery) score += 120;
+    if (normalizedCombined === normalizedQuery) score += 90;
+
+    if (normalizedTrack.startsWith(normalizedQuery)) score += 80;
+    else if (normalizedTrack.includes(normalizedQuery)) score += 52;
+
+    if (normalizedArtist.startsWith(normalizedQuery)) score += 48;
+    else if (normalizedArtist.includes(normalizedQuery)) score += 30;
+
+    if (normalizedAlbum.includes(normalizedQuery)) score += 20;
+    if (normalizedCombined.includes(normalizedQuery)) score += 24;
+
+    for (const token of tokens) {
+        if (normalizedTrack.startsWith(token)) score += 16;
+        else if (normalizedTrack.includes(token)) score += 10;
+
+        if (normalizedArtist.startsWith(token)) score += 12;
+        else if (normalizedArtist.includes(token)) score += 8;
+
+        if (normalizedAlbum.includes(token)) score += 4;
+    }
+
+    if (lyric.syncedLyrics?.trim()) score += 6;
+    if ((lyric.searchHistory || 0) > 0) score += Math.min(12, Math.floor((lyric.searchHistory || 0) / 10));
+
+    return score;
+};
+
+const scoreDuplicateCandidate = (args: {
+    trackName: string;
+    artistName: string;
+    duration?: number;
+    syncedLyrics?: string;
+    plainLyrics?: string;
+}, lyric: LyricDoc) => {
+    const normalizedTrack = normalizeText(args.trackName);
+    const normalizedArtist = normalizeArtist(args.artistName);
+    const normalizedLyrics = fingerprintLyrics(args.syncedLyrics || args.plainLyrics || "");
+
+    const candidateTrack = normalizeText(lyric.trackName);
+    const candidateArtist = normalizeArtist(lyric.artistName);
+    const candidateLyrics = fingerprintLyrics(lyric.syncedLyrics || lyric.plainLyrics || "");
+    const durationDelta = getDurationDelta(args.duration, lyric.duration);
+
+    const trackExact = normalizedTrack.length > 0 && normalizedTrack === candidateTrack;
+    const artistExact = normalizedArtist.length > 0 && normalizedArtist === candidateArtist;
+    const lyricsExact = normalizedLyrics.length > 0 && normalizedLyrics === candidateLyrics;
+    const durationClose = Number.isFinite(durationDelta) && durationDelta <= 3;
+    const durationNear = Number.isFinite(durationDelta) && durationDelta <= 10;
+    const titleOverlap =
+        normalizedTrack.length > 0 &&
+        candidateTrack.length > 0 &&
+        (normalizedTrack.includes(candidateTrack) || candidateTrack.includes(normalizedTrack));
+    const artistOverlap =
+        normalizedArtist.length > 0 &&
+        candidateArtist.length > 0 &&
+        (normalizedArtist.includes(candidateArtist) || candidateArtist.includes(normalizedArtist));
+
+    let score = 0;
+    if (trackExact) score += 50;
+    if (artistExact) score += 30;
+    if (lyricsExact) score += 45;
+    if (durationClose) score += 20;
+    else if (durationNear) score += 10;
+    if (!trackExact && titleOverlap) score += 18;
+    if (!artistExact && artistOverlap) score += 12;
+    if (lyric.isApproved) score += 5;
+
+    const matchReasons = [
+        trackExact ? "track-match" : null,
+        artistExact ? "artist-match" : null,
+        lyricsExact ? "lyrics-match" : null,
+        durationClose ? "duration-close" : durationNear ? "duration-near" : null,
+        !trackExact && titleOverlap ? "track-similar" : null,
+        !artistExact && artistOverlap ? "artist-similar" : null,
+    ].filter(Boolean) as string[];
+
+    const isStrongDuplicate =
+        (trackExact && artistExact) ||
+        (lyricsExact && (trackExact || artistExact || durationClose));
+
+    return {
+        score,
+        isStrongDuplicate,
+        matchReasons,
+        durationDelta: Number.isFinite(durationDelta) ? durationDelta : null,
+        trackExact,
+        artistExact,
+        lyricsExact,
+    };
+};
+
+type DuplicateCandidate = {
+    lyric: LyricDoc;
+    score: number;
+    isStrongDuplicate: boolean;
+    matchReasons: string[];
+    durationDelta: number | null;
+    trackExact: boolean;
+    artistExact: boolean;
+    lyricsExact: boolean;
+};
+
+const NON_REJECTED_STATUSES = ["approved", "pending", "improvement_pending"] as const;
+
+const fetchDuplicateCandidatePool = async (
+    ctx: any,
+    args: {
+        trackName: string;
+        artistName: string;
+    }
+): Promise<LyricDoc[]> => {
+    const candidates = new Map<string, LyricDoc>();
+    const addBatch = (batch: LyricDoc[]) => {
+        for (const lyric of batch) {
+            if (lyric.status === "rejected") continue;
+            candidates.set(String(lyric._id), lyric);
+        }
+    };
+
+    const [exactTrackArtist, artistMatches] = await Promise.all([
+        ctx.db
+            .query("lyrics")
+            .withIndex("by_track_artist", (q: any) =>
+                q.eq("trackName", args.trackName).eq("artistName", args.artistName)
+            )
+            .collect(),
+        ctx.db
+            .query("lyrics")
+            .withIndex("by_artist", (q: any) => q.eq("artistName", args.artistName))
+            .order("desc")
+            .take(180),
+    ]);
+    addBatch(exactTrackArtist);
+    addBatch(artistMatches);
+
+    // Search-index fallback for track title similarity across non-rejected statuses
+    // (helps catch near-duplicates where artist/title strings differ slightly).
+    const searchBatches = await Promise.all(
+        NON_REJECTED_STATUSES.map((status) =>
+            ctx.db
+                .query("lyrics")
+                .withSearchIndex("search_lyrics", (q: any) =>
+                    q.search("trackName", args.trackName).eq("status", status)
+                )
+                .take(100)
+        )
+    );
+    for (const batch of searchBatches) addBatch(batch);
+
+    return [...candidates.values()];
+};
+
+const findDuplicateCandidates = async (ctx: any, args: {
+    trackName: string;
+    artistName: string;
+    duration?: number;
+    syncedLyrics?: string;
+    plainLyrics?: string;
+}) => {
+    const lyrics = await fetchDuplicateCandidatePool(ctx, args);
+    const deduped = new Map<string, DuplicateCandidate>();
+
+    lyrics
+        .map((lyric: LyricDoc): DuplicateCandidate => {
+            const match = scoreDuplicateCandidate(args, lyric);
+            return {
+                lyric,
+                ...match,
+            };
+        })
+        .filter((candidate) => candidate.score >= 45)
+        .forEach((candidate) => {
+            const rootId = String(getRootLyricId(candidate.lyric));
+            const existing = deduped.get(rootId);
+            if (!existing || candidate.score > existing.score) {
+                deduped.set(rootId, candidate);
+            }
+        });
+
+    return [...deduped.values()].sort(
+        (a, b) => b.score - a.score || Number(a.durationDelta ?? 9999) - Number(b.durationDelta ?? 9999)
+    );
+};
 
 // ============ NOTIFICATIONS ============
 
 export const getUserNotifications = query({
-    args: { userId: v.optional(v.id("users")) },
+    args: { token: v.string() },
     handler: async (ctx, args) => {
-        if (!args.userId) return [];
+        const session = await ctx.db
+            .query("sessions")
+            .withIndex("by_token", (q: any) => q.eq("token", args.token))
+            .unique();
+
+        if (!session) return [];
+        if (Date.now() > session.expiresAt) return [];
+
         return await ctx.db
             .query("notifications")
-            .withIndex("by_user_id", (q) => q.eq("userId", args.userId!))
+            .withIndex("by_user_id", (q) => q.eq("userId", session.userId))
             .order("desc")
             .collect();
     },
 });
 
 export const markRead = mutation({
-    args: { id: v.id("notifications") },
+    args: { token: v.string(), id: v.id("notifications") },
     handler: async (ctx, args) => {
+        const session = await ctx.db
+            .query("sessions")
+            .withIndex("by_token", (q: any) => q.eq("token", args.token))
+            .unique();
+
+        if (!session) throw new Error("Unauthorized");
+        if (Date.now() > session.expiresAt) {
+            await ctx.db.delete(session._id);
+            throw new Error("Session expired");
+        }
+
+        const notification = await ctx.db.get(args.id);
+        if (!notification) throw new Error("Notification not found");
+        if (String(notification.userId) !== String(session.userId)) {
+            throw new Error("Forbidden");
+        }
+
         await ctx.db.patch(args.id, { isRead: true });
     },
 });
 
 export const markAllRead = mutation({
-    args: { userId: v.id("users") },
+    args: { token: v.string() },
     handler: async (ctx, args) => {
+        const session = await ctx.db
+            .query("sessions")
+            .withIndex("by_token", (q: any) => q.eq("token", args.token))
+            .unique();
+
+        if (!session) throw new Error("Unauthorized");
+        if (Date.now() > session.expiresAt) {
+            await ctx.db.delete(session._id);
+            throw new Error("Session expired");
+        }
+
         const unread = await ctx.db
             .query("notifications")
-            .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
+            .withIndex("by_user_id", (q) => q.eq("userId", session.userId))
             .filter((q) => q.eq(q.field("isRead"), false))
             .collect();
 
@@ -56,22 +335,33 @@ export const publish = mutation({
             throw new Error("Only synced lyrics are allowed to be published");
         }
 
-        // 1. Check if an approved version exists
-        const approvedVersion = await ctx.db
-            .query("lyrics")
-            .withIndex("by_track_artist", (q) =>
-                q.eq("trackName", args.trackName).eq("artistName", args.artistName)
-            )
-            .filter((q) => q.eq(q.field("isApproved"), true))
-            .unique();
+        const duplicateCandidates = await findDuplicateCandidates(ctx, args);
+        const topDuplicate = duplicateCandidates[0];
+        const rootDuplicate: LyricDoc | null = topDuplicate
+            ? await ctx.db.get(getRootLyricId(topDuplicate.lyric))
+            : null;
 
-        // 2. Prevent duplicate creation of base tracks
-        if (approvedVersion && !args.parentLyricId) {
-            return { 
-                success: false, 
-                duplicate: true, 
-                originalId: approvedVersion._id,
-                message: "This song already exists. You can suggest an improvement to it instead." 
+        if (!args.parentLyricId && topDuplicate?.isStrongDuplicate && rootDuplicate) {
+            return {
+                success: false,
+                duplicate: true,
+                originalId: rootDuplicate._id,
+                originalStatus: rootDuplicate.status,
+                message: rootDuplicate.isApproved
+                    ? "This song already exists. You can suggest an improvement instead."
+                    : "A matching submission is already pending review.",
+                suggestions: duplicateCandidates.slice(0, 5).map((candidate: any) => ({
+                    id: getRootLyricId(candidate.lyric),
+                    trackName: candidate.lyric.trackName,
+                    artistName: candidate.lyric.artistName,
+                    albumName: candidate.lyric.albumName,
+                    duration: candidate.lyric.duration,
+                    status: candidate.lyric.status,
+                    isApproved: candidate.lyric.isApproved,
+                    score: candidate.score,
+                    matchReasons: candidate.matchReasons,
+                    durationDelta: candidate.durationDelta,
+                })),
             };
         }
 
@@ -84,6 +374,39 @@ export const publish = mutation({
         });
 
         return { success: true, id };
+    },
+});
+
+export const findPossibleDuplicates = query({
+    args: {
+        trackName: v.string(),
+        artistName: v.string(),
+        duration: v.optional(v.number()),
+        plainLyrics: v.optional(v.string()),
+        syncedLyrics: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+        if (!args.trackName.trim() || !args.artistName.trim()) {
+            return [];
+        }
+
+        const candidates = await findDuplicateCandidates(ctx, args);
+
+        return candidates.slice(0, 5).map((candidate: any) => ({
+            id: getRootLyricId(candidate.lyric),
+            trackName: candidate.lyric.trackName,
+            artistName: candidate.lyric.artistName,
+            albumName: candidate.lyric.albumName,
+            duration: candidate.lyric.duration,
+            status: candidate.lyric.status,
+            isApproved: candidate.lyric.isApproved,
+            score: candidate.score,
+            matchReasons: candidate.matchReasons,
+            durationDelta: candidate.durationDelta,
+            syncedLyrics: candidate.lyric.syncedLyrics,
+            plainLyrics: candidate.lyric.plainLyrics,
+            isStrongDuplicate: candidate.isStrongDuplicate,
+        }));
     },
 });
 
@@ -102,6 +425,7 @@ export const search = query({
             )
             .filter((q) => q.eq(q.field("isApproved"), true))
             .collect();
+        results = results.filter(isCanonicalLyric);
 
         if (args.duration && results.length > 0) {
             return results.sort((a, b) =>
@@ -117,12 +441,38 @@ export const search = query({
 export const searchByText = query({
     args: { query: v.string() },
     handler: async (ctx, args) => {
-        return await ctx.db
+        const normalizedQuery = normalizeText(args.query);
+        if (!normalizedQuery) return [];
+
+        // Primary path: use Convex search index to narrow candidate set.
+        // This avoids full collection scans for typical queries.
+        const indexedCandidates = await ctx.db
             .query("lyrics")
             .withSearchIndex("search_lyrics", (q) =>
-                q.search("trackName", args.query).eq("isApproved", true)
+                q.search("trackName", args.query).eq("status", "approved").eq("isApproved", true)
             )
-            .collect();
+            .take(120);
+
+        let candidatePool = indexedCandidates.filter(isCanonicalLyric);
+
+        // Fallback for broad/edge queries: if indexed results are sparse,
+        // fetch approved canonical entries for scoring to maintain relevance.
+        if (candidatePool.length < 8) {
+            const allLyrics = await ctx.db.query("lyrics").collect();
+            candidatePool = allLyrics.filter((lyric) => lyric.isApproved && isCanonicalLyric(lyric));
+        }
+
+        return candidatePool
+            .map((lyric) => ({ lyric, score: scoreSearchCandidate(args.query, lyric) }))
+            .filter((item) => item.score > 0)
+            .sort(
+                (a, b) =>
+                    b.score - a.score ||
+                    (b.lyric.searchHistory || 0) - (a.lyric.searchHistory || 0) ||
+                    (b.lyric.updatedAt || b.lyric.createdAt) - (a.lyric.updatedAt || a.lyric.createdAt)
+            )
+            .slice(0, 25)
+            .map((item) => item.lyric);
     },
 });
 
@@ -218,9 +568,12 @@ export const getStats = query({
             throw new Error(validation.error || "Unauthorized");
         }
         const all = await ctx.db.query("lyrics").collect();
+        const canonicalApproved = all.filter(l => l.status === "approved" && !l.parentLyricId);
+        const approvedRevisions = all.filter(l => l.status === "approved" && !!l.parentLyricId);
         return {
             total: all.length,
-            approved: all.filter(l => l.status === "approved").length,
+            approved: canonicalApproved.length,
+            approvedRevisions: approvedRevisions.length,
             pending: all.filter(l => l.status === "pending").length,
             improvements: all.filter(l => l.status === "improvement_pending").length,
             rejected: all.filter(l => l.status === "rejected").length,
@@ -235,6 +588,7 @@ export const updateStatus = mutation({
         id: v.id("lyrics"),
         status: v.string(),
         rejectionReason: v.optional(v.string()),
+        mergeMetadata: v.optional(v.boolean()),
         token: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
@@ -250,13 +604,21 @@ export const updateStatus = mutation({
         
         // Handle Improvement Merging
         if (isApproved && lyric.status === "improvement_pending" && lyric.parentLyricId) {
-            // Apply changes to the parent record
-            await ctx.db.patch(lyric.parentLyricId, {
+            const parentPatch: Partial<LyricDoc> = {
                 plainLyrics: lyric.plainLyrics,
                 syncedLyrics: lyric.syncedLyrics,
-                albumName: lyric.albumName || undefined,
                 updatedAt: Date.now()
-            });
+            };
+
+            if (args.mergeMetadata) {
+                parentPatch.trackName = lyric.trackName;
+                parentPatch.artistName = lyric.artistName;
+                parentPatch.albumName = lyric.albumName || undefined;
+                parentPatch.duration = lyric.duration;
+            }
+
+            // Apply changes to the parent record
+            await ctx.db.patch(lyric.parentLyricId, parentPatch);
             // Mark the improvement record itself as approved/archived
             await ctx.db.patch(args.id, { 
                 status: "approved", 
@@ -295,6 +657,63 @@ export const updateStatus = mutation({
                 createdAt: Date.now(),
             });
         }
+    },
+});
+
+export const restoreVersion = mutation({
+    args: {
+        id: v.id("lyrics"),
+        token: v.optional(v.string()),
+        restoreMetadata: v.optional(v.boolean()),
+    },
+    handler: async (ctx, args) => {
+        const validation = await validateToken(ctx, args.token);
+        if (!validation.valid) {
+            throw new Error(validation.error || "Unauthorized");
+        }
+
+        const version = await ctx.db.get(args.id);
+        if (!version) throw new Error("Version not found");
+        if (!version.parentLyricId) {
+            throw new Error("Only improvement versions can be restored");
+        }
+
+        const parent = await ctx.db.get(version.parentLyricId);
+        if (!parent) throw new Error("Parent lyric not found");
+
+        await ctx.db.insert("lyrics", {
+            trackName: parent.trackName,
+            artistName: parent.artistName,
+            albumName: parent.albumName,
+            duration: parent.duration,
+            plainLyrics: parent.plainLyrics,
+            syncedLyrics: parent.syncedLyrics,
+            searchHistory: 0,
+            submittedBy: "Admin Restore Snapshot",
+            submittedById: validation.userId as LyricDoc["submittedById"],
+            status: "approved",
+            parentLyricId: parent._id,
+            isApproved: true,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+        });
+
+        const parentPatch: Partial<LyricDoc> = {
+            plainLyrics: version.plainLyrics,
+            syncedLyrics: version.syncedLyrics,
+            updatedAt: Date.now(),
+        };
+
+        if (args.restoreMetadata) {
+            parentPatch.trackName = version.trackName;
+            parentPatch.artistName = version.artistName;
+            parentPatch.albumName = version.albumName;
+            parentPatch.duration = version.duration;
+        }
+
+        await ctx.db.patch(parent._id, parentPatch);
+
+        return { success: true, parentId: parent._id };
     },
 });
 

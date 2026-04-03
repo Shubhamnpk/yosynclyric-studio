@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SEO } from '@/components/SEO';
 import { getAllProjects, createNewProject, deleteProject } from '@/utils/projectStorage';
@@ -78,18 +78,12 @@ const Dashboard = () => {
                         <p className="text-muted-foreground text-lg">Create and manage your synchronized lyrics projects.</p>
                     </div>
                     <div className="flex items-center gap-2 md:gap-3">
-                        <Button variant="outline" size="lg" onClick={() => navigate('/admin')} className="rounded-full px-3 md:px-6">
-                            <Shield className="md:mr-2 h-5 w-5" />
-                            <span className="hidden md:inline">Admin</span>
-                        </Button>
-                        <Button variant="outline" size="lg" onClick={() => navigate('/about')} className="rounded-full px-3 md:px-6">
-                            <Info className="md:mr-2 h-5 w-5" />
-                            <span className="hidden md:inline">About</span>
-                        </Button>
-                        <Button variant="outline" size="lg" onClick={() => navigate('/settings')} className="rounded-full px-3 md:px-6">
-                            <Settings2 className="md:mr-2 h-5 w-5" />
-                            <span className="hidden md:inline">Settings</span>
-                        </Button>
+                        {user?.role === 'admin' && (
+                            <Button variant="outline" size="lg" onClick={() => navigate('/admin')} className="rounded-full px-3 md:px-6">
+                                <Shield className="md:mr-2 h-5 w-5" />
+                                <span className="hidden md:inline">Admin</span>
+                            </Button>
+                        )}
                         <NotificationBell />
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -246,3 +240,5 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
+
